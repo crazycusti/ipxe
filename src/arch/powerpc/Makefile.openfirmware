@@ -1,0 +1,9 @@
+LDSCRIPT = arch/powerpc/scripts/openfirmware.lds
+SRCDIRS += interface/openfirmware
+SRCDIRS := $(filter-out drivers/%,$(SRCDIRS))
+NON_AUTO_MEDIA += of
+$(BIN)/%.of : $(BIN)/%.of.tmp
+	$(CP) $< $@
+LDFLAGS += --undefined=_of_start
+DRIVERS_none := platform
+DRIVERS_ipxe += ofnet

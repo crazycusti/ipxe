@@ -1,0 +1,5 @@
+FILE_LICENCE ( GPL2_OR_LATER );
+#ifdef PLATFORM_openfirmware
+PROVIDE_REQUIRING_SYMBOL ();
+REQUIRE_OBJECT ( platform );
+#endif

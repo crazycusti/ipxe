@@ -1,0 +1,14 @@
+LDSCRIPT = arch/sparc64/scripts/openfirmware.lds
+SRCDIRS += interface/openfirmware
+NON_AUTO_MEDIA += of
+$(BIN)/%.of : $(BIN)/%.of.tmp
+	$(CP) $< $@
+
+LDFLAGS += --undefined=_of_start
+
+# Initial native port uses IEEE 1275 services, without direct hardware drivers.
+SRCDIRS := $(filter-out drivers/%,$(SRCDIRS))
+
+DRIVERS_none := platform
+
+DRIVERS_ipxe += ofnet

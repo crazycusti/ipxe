@@ -43,6 +43,11 @@ FILE_SECBOOT ( PERMITTED );
 #define DOWNLOAD_PROTO_TFTP	/* Trivial File Transfer Protocol */
 #define DOWNLOAD_PROTO_HTTP	/* Hypertext Transfer Protocol */
 #define DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
+
+/* The initial Open Firmware port has no qualified entropy or wall clock. */
+#if defined ( PLATFORM_openfirmware )
+  #undef DOWNLOAD_PROTO_HTTPS
+#endif
 //#define DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */
 //#define DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
 //#define DOWNLOAD_PROTO_NFS	/* Network File System Protocol */

@@ -1,6 +1,10 @@
 iPXE network bootloader
 =======================
 
+This fork develops experimental native SPARC64 and PowerPC IEEE 1275
+clients. See [MULTIARCH.md](MULTIARCH.md) for builds, reproducible tests
+and the current limits, including the unfinished operating-system handoff.
+
 [![Build](https://img.shields.io/github/actions/workflow/status/ipxe/ipxe/build.yml)](https://github.com/ipxe/ipxe/actions/workflows/build.yml?query=branch%3Amaster)
 [![Coverity](https://img.shields.io/coverity/scan/12130)](https://scan.coverity.com/projects/ipxe-ipxe)
 [![Release](https://img.shields.io/github/v/release/ipxe/ipxe)](https://github.com/ipxe/ipxe/releases/latest)
