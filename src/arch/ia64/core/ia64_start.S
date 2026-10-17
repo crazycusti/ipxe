@@ -70,9 +70,9 @@ _start:
 
 	// PE32+ wants a PLABEL, not the code address of the entry point:
 
-	.align 4096
 	.global _start_plabel
 	.section .plabel, "a"
+	.balign 4096
 _start_plabel:
 	data8	_start
 	data8	__gp
