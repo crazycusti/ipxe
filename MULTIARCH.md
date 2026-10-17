@@ -459,3 +459,13 @@ The Intel PCI NIC fixtures do not implement the onboard HP 712 LAN,
 PowerMac Sungem or Sun HME drivers inside iPXE. Solaris/HP-UX/OpenVMS and
 Mezereon transitions through these new clients are separate OS adapters;
 the existing firmware-native boot profiles are retained.
+
+A further archived Debian SPARC32 Linux 2.6.8-4 baseline and iPXE handoff now
+reach a real `sparc` RAM shell. `ramdisk_size=16384` avoids truncating the
+original ext2 initrd. Loading its matching `sunlance` module enables a
+successful HTTP download from inside Linux. The authoritative test chains
+all network proof commands with `&&`; an earlier diagnostic that reached
+the shell despite a failed uninitialised-NIC probe is not a network proof.
+This is an archived 2007 bring-up profile, not a current Gentoo SPARC32
+installer. `--shell-prompt` in the test helper supports its minimal shell.
+The bound on larger kernels and the old 2.4 Zilog stall still apply.

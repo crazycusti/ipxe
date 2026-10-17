@@ -36,6 +36,7 @@ def main():
  p.add_argument('--reject-root',action='store_true',help='Prove rejection with a deliberately incorrect pinned SHA256')
  p.add_argument('--overlay', type=Path, help='Official extra initramfs modules')
  p.add_argument('--guest-command', default='uname -m', help='Guest proof command, before the final marker')
+ p.add_argument('--shell-prompt',help='Explicit prompt regex for a non-Gentoo RAM shell')
  p.add_argument('--args', required=True)
  p.add_argument('--profile-url', help='Chain an already published profile instead of the temporary HTTP fixture')
  p.add_argument('--qemu-dir', type=Path, default=Path('/opt/qemu/11.1.2/bin'))
@@ -45,6 +46,9 @@ def main():
  p.add_argument('--graphical-console', action='store_true', help='Prove Mac live console through framebuffer and keyboard')
  p.add_argument('--pci-serial', action='store_true', help='Add PCI UART for Linux on Mac99')
  a = p.parse_args()
+ if a.shell_prompt:
+  try:re.compile(a.shell_prompt)
+  except re.error as error:p.error('Invalid shell prompt: '+str(error))
  if a.os=='linux' and not a.initrd:p.error('Linux requires --initrd')
  if a.reject_root and not a.rootfs:p.error('--reject-root requires --rootfs')
  for source in filter(None,(a.kernel, a.initrd, a.iso, a.rootfs)):
@@ -155,7 +159,7 @@ def main():
       proc.stdin.write(b'\x03');proc.stdin.flush();shell_chosen=True
     if a.graphical_console and not sent and ('root@livecd' in screen_text or 'livecd ~ #' in screen_text):
      keyboard(a.guest_command+' && echo QEMU_OS_RUNTIME_OK\n');sent=True
-    if not a.graphical_console and not sent and ('root@livecd' in plain or 'livecd ~ #' in plain or ('Thank you for using Gentoo Linux' in plain and '(none) ~ #' in plain) or (a.os=='netbsd' and shell_chosen and plain.rstrip().endswith('#'))):
+    if not a.graphical_console and not sent and ('root@livecd' in plain or 'livecd ~ #' in plain or ('Thank you for using Gentoo Linux' in plain and '(none) ~ #' in plain) or (a.os=='netbsd' and shell_chosen and plain.rstrip().endswith('#')) or (linux and a.shell_prompt and re.search(a.shell_prompt,plain,re.M))):
      (uart.sendall if uart is not None else proc.stdin.write)((a.guest_command+" && printf '\\nQEMU_OS_RUNTIME_OK\\n'\r").encode());proc.stdin.flush();sent=True
     runtime=bool(re.search(r'(?:^|\n)QEMU_OS_RUNTIME_OK\n',plain+'\n'+screen_text))
     if runtime or 'NATIVE_OS_BOOT_FAILED' in plain or 'Kernel panic' in plain or 'NETBOOT_ROOT_FAILED' in plain+screen_text:break
@@ -166,10 +170,11 @@ def main():
             '/root.squashfs' in {r['path'] for r in requests} and '/root-verified' not in {r['path'] for r in requests} and
             'Genkernel ' not in plain and not runtime)
   if a.reject_root:passed=bool(rejected)
-  result={'architecture':a.architecture,'passed':passed,'linux_kernel_entered':linux,'guest_command_executed':runtime,'http_requests':requests,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'qemu_version':subprocess.check_output([command[0],'--version'],text=True).splitlines()[0],'iso_path':str(a.iso),'machine':a.machine,'guest_machine':next(iter(re.findall(r'(?:^|\n)(alpha|ppc|ppc64|ppc64le|sparc64|parisc|parisc64)\n',plain+'\n'+screen_text)),None),'guest_kernel_warnings':sorted(set(re.findall(r'BUG: [^\r\n]+',plain))),'iso_readonly':True,'root_filesystem_source':'read-only official live ISO','hardware_verified':False}
+  result={'architecture':a.architecture,'passed':passed,'linux_kernel_entered':linux,'guest_command_executed':runtime,'http_requests':requests,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'qemu_version':subprocess.check_output([command[0],'--version'],text=True).splitlines()[0],'iso_path':str(a.iso),'machine':a.machine,'guest_machine':next(iter(re.findall(r'(?:^|\n)(alpha|ppc|ppc64|ppc64le|sparc|sparc64|parisc|parisc64)\n',plain+'\n'+screen_text)),None),'guest_kernel_warnings':sorted(set(re.findall(r'BUG: [^\r\n]+',plain))),'iso_readonly':True,'root_filesystem_source':'read-only official live ISO','hardware_verified':False}
   result.update(iso_path=str(a.iso) if a.iso else None,iso_readonly=True if a.iso else None,root_filesystem_source='SHA256-verified HTTP SquashFS' if a.rootfs else 'read-only official live ISO',guest_command=a.guest_command,network_root_verified=bool(a.rootfs and passed and not a.reject_root),rootfs_sha256=hashlib.sha256(a.rootfs.read_bytes()).hexdigest() if a.rootfs else None,root_rejection_verified=bool(rejected))
   result.update(operating_system=a.os,guest_kernel_entered=linux,linux_kernel_entered=linux and a.os=='linux')
   result['profile_url']=a.profile_url
+  result['shell_prompt']=a.shell_prompt
   if not a.iso and not a.rootfs:result['root_filesystem_source']='kernel embedded RAM root' if a.os=='netbsd' else 'standalone initrd'
   (a.output/'result.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result),flush=True)
   if not passed:raise SystemExit(1)
