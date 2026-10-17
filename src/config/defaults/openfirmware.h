@@ -12,7 +12,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define SANBOOT_NULL
 #define TIME_NULL
 #define REBOOT_NULL
+#if defined ( __powerpc__ ) || defined ( __powerpc64__ )
+#define PCIAPI_OFPCI
+#else
 #define PCIAPI_NULL
+#endif
 #define ACPI_NULL
 #define MPAPI_NULL
 #define SERIAL_NULL

@@ -13,6 +13,7 @@ import re
 import resource
 import shutil
 import subprocess
+import struct
 import threading
 import time
 
@@ -21,16 +22,23 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('architecture', choices=['sparc32', 'sparc64', 'powerpc', 'hppa'])
-    parser.add_argument('kind', choices=['selftests', 'menu', 'input', 'network'])
+    parser.add_argument('architecture', choices=['sparc32', 'sparc64', 'powerpc', 'powerpc64', 'powerpc64le', 'hppa', 'alpha'])
+    parser.add_argument('kind', choices=['selftests', 'menu', 'input', 'network', 'deployed-menu'])
     parser.add_argument('output', type=Path)
     parser.add_argument('--seconds', type=int, default=600)
     parser.add_argument('--qemu', help='Override the QEMU system emulator executable')
+    parser.add_argument('--machine')
+    parser.add_argument('--cpu')
+    parser.add_argument('--cross')
+    parser.add_argument('--capture', action='store_true')
+    parser.add_argument('--binary', type=Path, help='Test an exact existing loader without rebuilding')
     parser.add_argument('--debug', help='Comma-separated iPXE debug objects')
     parser.add_argument('--trace', action='store_true', help='Capture bounded QEMU exception tracing')
     args = parser.parse_args()
-    if args.kind == 'network' and args.architecture in ['sparc32', 'sparc64']:
+    if args.kind in ['network', 'deployed-menu'] and args.architecture in ['sparc32', 'sparc64']:
         raise SystemExit('Network qualification is not available for this target yet.')
+    if args.kind == 'deployed-menu' and not args.binary:
+        parser.error('deployed-menu requires --binary')
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=False)
     requests = []
@@ -67,10 +75,12 @@ exit
     proc = None
     try:
         build = ['make', '-C', str(ROOT / 'src'), '-j8', 'CROSS=' +
-                 ({'sparc32': 'sparc64-linux-gnu-', 'sparc64': 'sparc64-linux-gnu-', 'powerpc': 'powerpc-linux-gnu-', 'hppa': 'hppa-linux-gnu-'}[args.architecture])]
-        suffix = '.lif' if args.architecture == 'hppa' else '.of'
-        platform = 'pdc' if args.architecture == 'hppa' else 'openfirmware'
-        target = ('tests' if args.kind == 'selftests' else 'ipxe' if args.kind == 'network' else 'none') + suffix
+                 (args.cross or {'sparc32': 'sparc64-linux-gnu-', 'sparc64': 'sparc64-linux-gnu-', 'powerpc': 'powerpc-linux-gnu-', 'powerpc64': '/data/netboot/sources/multiarch-toolchains/gcc-13.3.0-nolibc/powerpc64-linux/bin/powerpc64-linux-', 'powerpc64le': 'powerpc64le-linux-gnu-', 'alpha': '/data/netboot/sources/multiarch-toolchains/gcc-13.3.0-nolibc/alpha-linux/bin/alpha-linux-', 'hppa': 'hppa-linux-gnu-'}[args.architecture])]
+        suffix = {'hppa': '.lif', 'alpha': '.srm'}.get(args.architecture, '.of')
+        if args.architecture == 'powerpc64' and args.machine == 'mac99':
+            suffix = '.mac'
+        platform = {'hppa': 'pdc', 'alpha': 'srm'}.get(args.architecture, 'openfirmware')
+        target = ('tests' if args.kind == 'selftests' else 'ipxe' if args.kind in ['network', 'deployed-menu'] else 'none') + suffix
         if args.debug:
             build += ['DEBUG=' + args.debug]
         if args.kind != 'selftests':
@@ -89,25 +99,49 @@ exit
             build += ['EMBED=' + str(embedded)]
         build += ['bin-' + args.architecture + '-' + platform + '/' + target]
         (args.output / 'build-command.json').write_text(json.dumps(build, indent=2) + '\n')
-        with (args.output / 'build.log').open('wb') as log:
-            subprocess.run(build, check=True, stdout=log, stderr=subprocess.STDOUT)
         binary = args.output / target
-        shutil.copy2(ROOT / 'src' / ('bin-' + args.architecture + '-' + platform) / target, binary)
+        if args.binary:
+            shutil.copy2(args.binary, binary)
+        else:
+            with (args.output / 'build.log').open('wb') as log:
+                subprocess.run(build, check=True, stdout=log, stderr=subprocess.STDOUT)
+            shutil.copy2(ROOT / 'src' / ('bin-' + args.architecture + '-' + platform) / target, binary)
         if args.architecture == 'sparc64':
             command = ['qemu-system-sparc64', '-M', 'sun4u', '-m', '2048', '-kernel', str(binary), '-nic', 'none']
         elif args.architecture == 'sparc32':
             command = ['qemu-system-sparc', '-M', 'SS-5', '-m', '128', '-kernel', str(binary), '-nic', 'none']
+        elif args.architecture == 'alpha':
+            command = ['qemu-system-alpha', '-M', 'clipper', '-m', '256', '-kernel', str(binary),
+                       '-nic', 'user,id=net0,model=e1000' if args.kind in ['network', 'deployed-menu'] else 'none']
         elif args.architecture == 'hppa':
-            command = ['qemu-system-hppa', '-M', 'B160L', '-m', '128', '-drive', 'if=scsi,format=raw,readonly=on,file=' + str(binary), '-nic', 'none']
-            if args.kind == 'network':
-                command[-1] = 'user,model=e1000'
+            command = ['qemu-system-hppa', '-M', args.machine or 'B160L', '-m', '128', '-drive', 'if=scsi,format=raw,readonly=on,file=' + str(binary), '-nic', 'none']
+            if args.kind in ['network', 'deployed-menu']:
+                command[-1] = 'user,id=net0,model=e1000'
         else:
             command = ['qemu-system-ppc64', '-M', 'pseries', '-cpu', 'POWER9', '-m', '1024',
-                       '-nic', 'user,model=virtio-net-pci,tftp=' + str(args.output) + ',bootfile=' + target, '-boot', 'n']
+                       '-nic', 'user,id=net0,model=virtio-net-pci,tftp=' + str(args.output) + ',bootfile=' + target, '-boot', 'n']
+        if args.architecture in ['powerpc', 'powerpc64'] and args.machine == 'mac99':
+            # Mac99's -kernel loader adds 16 MiB to every ELF physical address.
+            # Translate only the disposable fixture; leave the deployable ELF alone.
+            image = bytearray(binary.read_bytes())
+            phoff = struct.unpack_from('>I', image, 28)[0]
+            entsize, count = struct.unpack_from('>HH', image, 42)
+            for i in range(count):
+                at = phoff + i * entsize
+                if struct.unpack_from('>I', image, at)[0] == 1:
+                    physical = struct.unpack_from('>I', image, at + 12)[0]
+                    struct.pack_into('>I', image, at + 12, physical - 0x01000000)
+            fixture = args.output / 'mac99-kernel.elf'
+            fixture.write_bytes(image)
+            command = ['qemu-system-ppc64', '-M', 'mac99', '-cpu', args.cpu or '970',
+                       '-m', '512', '-kernel', str(fixture), '-nic', 'user,id=net0,model=e1000' if args.kind in ['network', 'deployed-menu'] else 'none',
+                       '-prom-env', 'output-device=scca', '-prom-env', 'input-device=scca']
         if args.qemu:
             command[0] = args.qemu
         emulator_version = subprocess.check_output([command[0], '--version'], text=True).splitlines()[0]
         command += ['-nographic', '-monitor', 'unix:' + str(args.output / 'monitor.sock') + ',server=on,wait=off', '-no-reboot']
+        if args.capture:
+            command += ['-object', 'filter-dump,id=capture,netdev=net0,file=' + str(args.output / 'network.pcap')]
         if args.trace:
             command += ['-d', 'int', '-D', str(args.output / 'exceptions.log')]
         (args.output / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
@@ -131,6 +165,8 @@ exit
                     break
                 if args.kind == 'selftests':
                     passed = bool(re.search(r'OK: all \d+ tests passed', text))
+                elif args.kind == 'deployed-menu':
+                    passed = ('Netboot ' + args.architecture) in text and 'menu-native.ipxe... ok' in text
                 elif args.kind == 'network':
                     passed = 'OFW_NETWORK_OK' in text and 'OFW_MENU_OK' in text and digest in text
                 else:
@@ -144,7 +180,10 @@ exit
                   'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'http_requests': requests,
                   'hardware_verified': False, 'operating_system_handoff_verified': False,
                   'console_input_verified': args.kind == 'input' and input_sent and passed,
-                  'firmware_network_boot_verified': args.architecture == 'powerpc' and passed,
+                  'machine': command[command.index('-M') + 1],
+                  'deployed_menu_verified': args.kind == 'deployed-menu' and passed,
+                  'original_binary': str(args.binary.resolve()) if args.binary else None,
+                  'firmware_network_boot_verified': args.architecture.startswith('powerpc') and args.machine != 'mac99' and passed,
                   'firmware_scsi_palo_boot_verified': args.architecture == 'hppa' and passed}
         (args.output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
         print(json.dumps(result), flush=True)

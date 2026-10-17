@@ -50,7 +50,7 @@ FILE_SECBOOT ( PERMITTED );
 		  "\nstored_cert_" #_index "_data:\n\t"			\
 		  ".incbin \"" _path "\"\n\t"				\
 		  "\nstored_cert_" #_index "_end:\n\t"			\
-		  ".set stored_cert_" #_index "_len, "			\
+		  _S2 ( ASM_EQU ) " stored_cert_" #_index "_len, "			\
 			"( stored_cert_" #_index "_end - "		\
 			"  stored_cert_" #_index "_data )\n\t"		\
 		  ".previous\n\t" );

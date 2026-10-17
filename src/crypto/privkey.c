@@ -61,7 +61,7 @@ __asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"
 	  ".incbin \"" PRIVATE_KEY "\"\n\t"
 #endif /* PRIVATE_KEY */
 	  ".size private_key_data, ( . - private_key_data )\n\t"
-	  ".set private_key_len, ( . - private_key_data )\n\t"
+	  _S2 ( ASM_EQU ) " private_key_len, ( . - private_key_data )\n\t"
 	  ".previous\n\t" );
 
 /** Private key */

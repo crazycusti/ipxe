@@ -598,7 +598,7 @@ const char * fdt_string ( struct fdt *fdt, unsigned int offset,
 int fdt_cells ( struct fdt *fdt, unsigned int offset, const char *name,
 		unsigned int index, unsigned int count, uint64_t *value ) {
 	struct fdt_descriptor desc;
-	const uint32_t *cell;
+	const fdt_token_t *cell;
 	unsigned int total;
 	int rc;
 
@@ -767,7 +767,7 @@ int fdt_parent_reg_cells ( struct fdt *fdt, unsigned int offset,
 int fdt_reg_count ( struct fdt *fdt, unsigned int offset,
 		    struct fdt_reg_cells *regs ) {
 	struct fdt_descriptor desc;
-	const uint32_t *cell;
+	const fdt_token_t *cell;
 	unsigned int count;
 	int rc;
 

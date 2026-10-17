@@ -1,0 +1,15 @@
+LDSCRIPT = arch/alpha/scripts/srm.lds
+SRCDIRS += interface/srm
+SRCDIRS := $(filter-out drivers/% interface/xen,$(SRCDIRS))
+SRCS += drivers/bus/pci.c drivers/bus/pci_settings.c drivers/net/intel.c drivers/nvs/nvs.c
+NON_AUTO_MEDIA += srm bootp
+ABOOT ?= netabootwrap
+$(BIN)/%.bootp : $(BIN)/%.srm
+	$(OBJCOPY) --strip-debug $< $(BIN)/$*.srm.stripped
+	gzip -n -c $(BIN)/$*.srm.stripped > $(BIN)/$*.srm.gz
+	$(ABOOT) -t $@ -k $(BIN)/$*.srm.gz -a ""
+$(BIN)/%.srm : $(BIN)/%.srm.tmp
+	$(CP) $< $@
+LDFLAGS += --undefined=_srm_start
+DRIVERS_none := srm_platform
+DRIVERS_ipxe := srm_platform intel pci

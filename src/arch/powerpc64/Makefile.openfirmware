@@ -1,0 +1,15 @@
+LDSCRIPT = arch/powerpc64/scripts/openfirmware.lds
+SRCDIRS += interface/openfirmware
+SRCDIRS := $(filter-out drivers/% interface/xen,$(SRCDIRS))
+SRCS += drivers/bus/pci.c drivers/bus/pci_settings.c drivers/net/intel.c drivers/nvs/nvs.c
+NON_AUTO_MEDIA += of mac
+ifeq ($(ARCH),powerpc64)
+# Apple firmware expects an ELF32 loader even when the payload uses PPC64.
+$(BIN)/%.mac : $(BIN)/%.of
+	$(OBJCOPY) -O elf32-powerpc --set-start=$$($(NM) $< | awk '$$3 == "_of_code_entry" { print "0x" $$1 }') $< $@
+endif
+$(BIN)/%.of : $(BIN)/%.of.tmp
+	$(CP) $< $@
+LDFLAGS += --undefined=_of_start
+DRIVERS_none := platform
+DRIVERS_ipxe += ofnet intel pci

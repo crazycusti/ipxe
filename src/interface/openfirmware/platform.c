@@ -1,6 +1,7 @@
 /* Experimental IEEE 1275 platform services. */
 FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
+#include <byteswap.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <ipxe/console.h>
@@ -10,6 +11,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static long ( *of_entry ) ( struct of_args * );
 static of_cell_t of_stdin, of_stdout;
 static int of_pending = -1;
+
+#ifdef __powerpc64__
+extern int of_arch_invoke ( struct of_args *, unsigned long );
+#endif
 
 int of_call ( const char *name, unsigned int nargs, unsigned int nret,
 	      of_cell_t *cells )
@@ -25,11 +30,26 @@ int of_call ( const char *name, unsigned int nargs, unsigned int nret,
 		a.args[i] = cells[i];
 	for ( ; i < nargs + nret; i++ )
 		a.args[i] = 0;
+	#ifdef __powerpc64__
+	if ( (unsigned long)&a > 0xffffffffUL || (unsigned long)name > 0xffffffffUL )
+		return -1;
+	a.service = cpu_to_be32 ( a.service );
+	a.nargs = cpu_to_be32 ( a.nargs );
+	a.nret = cpu_to_be32 ( a.nret );
+	for ( i = 0; i < nargs + nret; i++ )
+		a.args[i] = cpu_to_be32 ( a.args[i] );
+	if ( of_arch_invoke ( &a, (unsigned long)of_entry ) )
+		return -1;
+	for ( i = 0; i < nret; i++ )
+		cells[i] = be32_to_cpu ( a.args[nargs + i] );
+	return 0;
+#else
 	if ( of_entry ( &a ) )
 		return -1;
 	for ( i = 0; i < nret; i++ )
 		cells[i] = a.args[nargs + i];
 	return 0;
+#endif
 }
 of_cell_t of_find ( const char *path )
 {

@@ -88,15 +88,18 @@ int cbc_setiv ( struct cipher_algorithm *cipher, void *ctx,
  * @v len		Length of data
  */
 static void cbc_xor ( const void *src, void *dst, size_t len ) {
-	const uint32_t *srcl = src;
-	uint32_t *dstl = dst;
+	uint32_t srcword, dstword;
 	unsigned int i;
 
 	/* Assume that block sizes will always be dword-aligned, for speed */
-	assert ( ( len % sizeof ( *srcl ) ) == 0 );
+	assert ( ( len % sizeof ( srcword ) ) == 0 );
 
-	for ( i = 0 ; i < ( len / sizeof ( *srcl ) ) ; i++ )
-		dstl[i] ^= srcl[i];
+	for ( i = 0 ; i < len ; i += sizeof ( srcword ) ) {
+		memcpy ( &srcword, src + i, sizeof ( srcword ) );
+		memcpy ( &dstword, dst + i, sizeof ( dstword ) );
+		dstword ^= srcword;
+		memcpy ( dst + i, &dstword, sizeof ( dstword ) );
+	}
 }
 
 /**

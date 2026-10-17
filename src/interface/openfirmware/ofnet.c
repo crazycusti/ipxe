@@ -43,7 +43,7 @@ static void ofnet_poll ( struct net_device *dev )
 		a[0] = nic->handle;
 		a[1] = (unsigned long)iob->data;
 		a[2] = 2048;
-		if ( of_call ( "read", 3, 1, a ) || (long)a[0] <= 0 ) {
+		if ( of_call ( "read", 3, 1, a ) || (of_scell_t)a[0] <= 0 ) {
 			free_iob ( iob );
 			return;
 		}
@@ -69,8 +69,14 @@ static int ofnet_probe ( struct root_device *root )
 	of_cell_t a[1];
 	of_cell_t node;
 	int rc;
-	a[0] = (unsigned long)"net";
-	if ( of_call ( "open", 1, 1, a ) || !a[0] || a[0] == (of_cell_t)-1 ) {
+	static const char * const aliases[] = { "net", "enet", "ethernet" };
+	unsigned int i;
+	for ( i = 0; i < sizeof ( aliases ) / sizeof ( aliases[0] ); i++ ) {
+		a[0] = (unsigned long)aliases[i];
+		if ( !of_call ( "open", 1, 1, a ) && a[0] && a[0] != (of_cell_t)-1 )
+			break;
+	}
+	if ( i == sizeof ( aliases ) / sizeof ( aliases[0] ) ) {
 		printf ( "IEEE1275 net open failed\n" );
 		return -ENODEV;
 	}
@@ -87,7 +93,7 @@ static int ofnet_probe ( struct root_device *root )
 		goto fail;
 	}
 	node = a[0];
-	printf ( "IEEE1275 network handle %lx node %lx\n", nic->handle, node );
+	printf ( "IEEE1275 network handle %lx node %lx\n", (unsigned long)nic->handle, (unsigned long)node );
 	if ( of_prop ( node, "local-mac-address", dev->hw_addr, ETH_ALEN ) !=
 		 ETH_ALEN &&
 	     of_prop ( node, "mac-address", dev->hw_addr, ETH_ALEN ) !=

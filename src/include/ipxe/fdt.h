@@ -46,7 +46,8 @@ struct fdt_header {
 #define FDT_VERSION 16
 
 /** Device tree token */
-typedef uint32_t fdt_token_t;
+/* Images may be byte-aligned in memory even though token offsets are aligned. */
+typedef uint32_t fdt_token_t __attribute__ (( aligned ( 1 ), may_alias ));
 
 /** Begin node token */
 #define FDT_BEGIN_NODE 0x00000001

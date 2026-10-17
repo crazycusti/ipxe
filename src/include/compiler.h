@@ -52,6 +52,9 @@
 /** Stringify expanded argument */
 #define _S2( x ) _S1 ( x )
 
+/* Assembler symbol assignment directive (Alpha uses .set for modes). */
+#define ASM_EQU .set
+
 /* Assembler section types */
 #ifdef ASSEMBLY
 #define PROGBITS _C2 ( ASM_TCHAR, progbits )
@@ -96,10 +99,10 @@
  */
 #ifdef ASSEMBLY
 #define REQUEST_SYMBOL( symbol )				\
-	.set __request_ ## symbol, symbol
+	ASM_EQU __request_ ## symbol, symbol
 #else
 #define REQUEST_SYMBOL( symbol )				\
-	__asm__ ( ".set __request_" #symbol ", " #symbol )
+	__asm__ ( _S2 ( ASM_EQU ) " __request_" #symbol ", " #symbol )
 #endif
 
 /**
@@ -135,10 +138,10 @@
  */
 #ifdef ASSEMBLY
 #define REQUIRING_SYMBOL( symbol )				\
-	.set __requiring_symbol__, symbol
+	ASM_EQU __requiring_symbol__, symbol
 #else
 #define REQUIRING_SYMBOL( symbol )				\
-	__asm__ ( ".set __requiring_symbol__, " #symbol )
+	__asm__ ( _S2 ( ASM_EQU ) " __requiring_symbol__, " #symbol )
 #endif
 
 /**

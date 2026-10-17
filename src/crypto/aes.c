@@ -164,7 +164,7 @@ aes_entry_column ( const union aes_table_entry *entry, unsigned int column ) {
 	const union {
 		uint8_t byte;
 		uint32_t column;
-	} __attribute__ (( may_alias )) *product;
+	} __attribute__ (( packed, may_alias )) *product;
 
 	/* Locate relevant four-byte subset */
 	product = container_of ( &entry->byte[ 4 - column ],

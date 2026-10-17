@@ -36,6 +36,8 @@ static void *of_urealloc ( void *ptr, size_t size )
 	if ( size > ( (size_t)-1 ) - OF_PAGE - ( OF_PAGE - 1 ) )
 		return NULL;
 	total = ( ( size + OF_PAGE - 1 ) & ~( OF_PAGE - 1 ) ) + OF_PAGE;
+	if ( total > (of_cell_t)-1 )
+		return NULL;
 	a[0] = 0;
 	a[1] = total;
 	a[2] = OF_PAGE;
@@ -48,7 +50,7 @@ static void *of_urealloc ( void *ptr, size_t size )
 		of_call ( "release", 2, 0, a );
 		return NULL;
 	}
-	fresh = (void *)a[0];
+	fresh = (void *)(unsigned long)a[0];
 	fresh->magic = OF_ALLOC_MAGIC;
 	fresh->total = total;
 	fresh->used = size;

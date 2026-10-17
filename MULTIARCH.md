@@ -1,7 +1,7 @@
 # Experimental iPXE multiarchitecture fork
 
-This fork adds native SPARC32/OpenPROM, SPARC64 and PPC32/IEEE 1275,
-narrow HPPA/PDC clients, and an IA-64 EFI client.
+This fork adds native SPARC32/OpenPROM, SPARC64, PPC32/PPC64 BE/PPC64 LE
+IEEE 1275, narrow HPPA/PDC and Alpha/SRM clients, and an IA-64 EFI client.
 It is intended as a foundation for a shared netboot environment and future
 Mezereon loading. The upstream tree and its licences remain intact.
 
@@ -13,13 +13,15 @@ Initial upstream base: `c51ca76` (the full revision is available with
 
 | Target | Native execution | Self-tests | Firmware/network/menu | OS handoff |
 |---|---|---|---|---|
-| SPARC64 / OpenBIOS sun4u | Yes, ELF bootstrap and real iPXE core | 12,240 passed | Local iPXE menu passed; stock OpenBIOS lacks the packet-I/O device used by the firmware network adapter | Not implemented or qualified |
-| PowerPC 32-bit client / SLOF pseries POWER9 | Yes; a native PPC32 client, not a PPC64 executable | 12,240 passed | Firmware DHCP/TFTP loads iPXE; iPXE DHCP, HTTP, SHA256 and downloaded menu passed | Not implemented or qualified |
-| PowerMac / OpenBIOS | Build available | Not qualified on this firmware | No packet-I/O qualification | Not qualified |
-| SPARC32 / OpenBIOS SS-5 (V8) | Yes, V8 ELF bootstrap and OpenPROM v2/v3 adapter | 12,240 passed | Serial menu passed; firmware network path is not qualified | Not implemented or qualified |
-| HPPA / PDC B160L | Yes, narrow PA-RISC 1.1 | 12,240 passed | Firmware SCSI/PALO boot, PDC console/menu, native Dino/Intel DHCP, HTTP/SHA256 and downloaded menu passed | Not implemented or qualified |
+| SPARC64 / OpenBIOS sun4u | Yes, ELF bootstrap and real iPXE core | 12,244 passed | Local iPXE menu passed; stock OpenBIOS lacks the packet-I/O device used by the firmware network adapter | Not implemented or qualified |
+| PowerPC 32-bit client / SLOF pseries POWER9 | Yes; a native PPC32 client, not a PPC64 executable | 12,244 passed | Firmware DHCP/TFTP loads iPXE; iPXE DHCP, HTTP, SHA256 and downloaded menu passed | Not implemented or qualified |
+| PowerMac / OpenBIOS Mac99, 970 CPU | PPC32 and native PPC64 BE; ELF32 PPC64 container | 12,244 passed | Serial input, native UniNorth/U3 PCI + Intel DHCP, HTTP/SHA256 and downloaded menu passed; direct QEMU load, not firmware TFTP | Not qualified |
+| SPARC32 / OpenBIOS SS-5 (V8) | Yes, V8 ELF bootstrap and OpenPROM v2/v3 adapter | 12,244 passed | Serial menu passed; firmware network path is not qualified | Not implemented or qualified |
+| HPPA / PDC B160L | Yes, narrow PA-RISC 1.1 | 12,244 passed | Firmware SCSI/PALO boot, PDC console/menu, native Dino/Intel DHCP, HTTP/SHA256 and downloaded menu passed | Not implemented or qualified |
 | IA-64 / experimental EFI Itanium emulator | Yes, PE32+ descriptor entry and native iPXE core | 12,244 passed | Serial input, menu timeout, native Intel DHCP/HTTP/TFTP with SHA256, and HTTP-chained SNP iPXE passed | EFI application chaining passed; OS installation not qualified |
-| PPC64 / PPC64LE ELF clients | Separate ABI/entry work required | Pending | A PPC32 SLOF client already runs on a POWER9 machine | Pending |
+| PPC64 BE and PPC64 LE / SLOF pseries POWER9 | Separate native 64-bit clients | 12,244 each | Firmware DHCP/TFTP, iPXE DHCP, HTTP/SHA256, menu and serial selection passed | Not qualified |
+| PA-RISC 2.0 / PDC C3700 | Narrow PDC client on the 64-bit CPU; Astro/Elroy PCI | 12,244 passed | SCSI/PALO boot, console/input, native Intel DHCP, HTTP/SHA256 and menu passed | No 64-bit OS handoff qualified |
+| Alpha EV6+ / QEMU DP264 (clipper) | Native 64-bit SRM/OSF PAL client | 12,244 passed | SRM callback console/input, Tsunami PCI + Intel DHCP, HTTP/SHA256 and menu passed; QEMU direct ELF entry | SRM BOOTP wrapper built; initial firmware boot and OS handoff unqualified |
 
 There is no physical-hardware qualification. These binaries have not replaced
 the operational PC, JavaStation, HPPA or Solaris boot files. A running iPXE
@@ -235,3 +237,87 @@ The added generic function-pointer test also passes on HPPA, SPARC32,
 SPARC64, PPC32 and x86-64. Current native suites have 12,244 checks;
 x86-64/Linux has 12,364. Original r1/r2 evidence records the older suite
 counts before these four additional checks.
+
+
+## PPC64, PA-RISC 2.0 and Alpha extension (r4, 2026-10-17)
+
+PowerPC64 BE uses ELFv1 function descriptors; LE uses ELFv2. Both keep the
+IEEE 1275 CIF argument block in big-endian 32-bit cells, even with 64-bit
+pointers in C. The assembly CIF bridge saves native register/MSR state,
+reserves the firmware caller argument area, switches to the firmware's
+32-bit BE mode and translation state, and restores the native client.
+The BE dependency relocations live outside `.opd`, so GNU ld recognises the
+function descriptors and the interface function identity checks still pass.
+
+For Apple firmware, `.mac` is an ELF32 container holding the actual PPC64
+code and data. Its entry switches a 32-bit firmware entry to the 64-bit
+client. It is not a PPC32 executable. The Mac99 fixture translates only
+its disposable ELF physical addresses to account for QEMU's 16 MiB load
+bias. Published `.mac` files retain their normal physical addresses.
+QEMU Mac99 with U3 and a 970 CPU covers that model, not every physical G5.
+Apple firmware packet I/O is retained; the emulated Intel card is tested
+through a host-bridge-checked UniNorth/U3 CFA0 PCI backend. The onboard G5
+Sungem and USB/ADB keyboards have no physical qualification.
+
+PA-RISC 2.0 uses the existing narrow PDC/PALO calling convention. PDC IODC
+must confirm each Dino/Elroy bridge before register access. Astro/Elroy has
+four independently addressed roots and PCI-endian selectors. Both B160L
+and C3700 complete actual network/menu tests. This does not turn the
+loader into a wide HPPA64 executable or qualify a 64-bit OS entry.
+
+Alpha currently targets EV6 and later with BWX, on the Tsunami chipset for
+native PCI. It enters with OSF PAL already selected, uses the HWRPB CRB
+console, a bounded image-owned heap, RPCC timing, Unix/VMS callback glue
+and compiler-convention integer division helpers. The direct PCI DMA
+window uses an unused window 0..2 and restores the original registers
+on shutdown; window 3 is scatter/gather-only. QEMU PALcode has a blocking
+GETC implementation, so the confirmed QEMU/Tsunami UART is polled before
+GETC. Other SRM firmware uses the callback's own nonblocking status.
+The payload is placed at physical 0x01010000 to leave the SRM loader and
+aboot's parameter area free. EV4/EV5, ARC/AlphaBIOS and other PCI chipsets
+are not qualified.
+
+Example builds (GNU cross compiler prefixes may be overridden):
+
+```sh
+make -C src CROSS=powerpc64-linux-gnu- bin-powerpc64-openfirmware/ipxe.of
+make -C src CROSS=powerpc64-linux-gnu- bin-powerpc64-openfirmware/ipxe.mac
+make -C src CROSS=powerpc64le-linux-gnu- bin-powerpc64le-openfirmware/ipxe.of
+make -C src CROSS=alpha-linux-gnu- bin-alpha-srm/ipxe.srm
+make -C src CROSS=alpha-linux-gnu- ABOOT=/path/to/netabootwrap bin-alpha-srm/ipxe.bootp
+```
+
+The Alpha `.srm` file is an ELF payload, not an SRM network container.
+`.bootp` wraps a stripped, gzip-compressed ELF with upstream aboot's
+`netabootwrap`. The pinned aboot source, ELF, compressed payload and wrapper
+must be distributed together with their licences/source archive. QEMU's
+PALcode has no real SRM BOOTP implementation: only the inner ELF is runtime
+qualified. Wrapper layout/decompression can be checked here; its first SRM
+firmware boot needs hardware. Do not announce an SRM PXE pass from the
+QEMU direct ELF result.
+
+The Alpha tests also exercise unaligned AES table columns, CBC buffers and
+byte-aligned FDT images. Those accesses now use packed tokens or memcpy;
+no checks or assertions were removed. `ASM_EQU` selects the assembler's
+symbol-assignment directive without changing other architectures' syntax.
+
+Additional test examples:
+
+```sh
+python3 tools/test-native.py powerpc64 selftests /tmp/ppc64-tests --cross=powerpc64-linux-gnu-
+python3 tools/test-native.py powerpc64 network /tmp/g5-tests --machine mac99 --cpu 970 --cross=powerpc64-linux-gnu-
+python3 tools/test-native.py powerpc64le network /tmp/ppc64le-tests
+python3 tools/test-native.py hppa network /tmp/pa20-tests --machine C3700
+python3 tools/test-native.py alpha selftests /tmp/alpha-tests --cross=alpha-linux-gnu-
+python3 tools/test-native.py alpha network /tmp/alpha-network --cross=alpha-linux-gnu- --capture
+```
+
+`--binary` tests an exact published loader. `deployed-menu --binary ...`
+asserts that this loader downloads the real central HTTP menu and displays
+its native architecture menu. It does not emulate an OS start.
+
+Final r4 evidence is under `/data/netboot/tests/ipxe-fork/r4-final-*`;
+failed earlier attempts remain separate. All eight native architecture
+self-test runs pass 12,244 checks each; x86-64/Linux passes 12,364. The
+separate IA64 emulator remains necessary. No physical hardware or Linux,
+Solaris, HP-UX, OpenVMS or Mezereon handoff is claimed for these ports.
