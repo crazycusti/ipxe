@@ -11,21 +11,22 @@ Initial upstream base: `c51ca76` (the full revision is available with
 
 ## Verified scope
 
-| Target | Native execution | Self-tests | Firmware/network/menu | OS handoff |
-|---|---|---|---|---|
-| SPARC64 / OpenBIOS sun4u | Yes, ELF bootstrap and real iPXE core | 12,244 passed | Local iPXE menu passed; stock OpenBIOS lacks the packet-I/O device used by the firmware network adapter | Not implemented or qualified |
-| PowerPC 32-bit client / SLOF pseries POWER9 | Yes; a native PPC32 client, not a PPC64 executable | 12,244 passed | Firmware DHCP/TFTP loads iPXE; iPXE DHCP, HTTP, SHA256 and downloaded menu passed | Not implemented or qualified |
-| PowerMac / OpenBIOS Mac99, 970 CPU | PPC32 and native PPC64 BE; ELF32 PPC64 container | 12,244 passed | Serial input, native UniNorth/U3 PCI + Intel DHCP, HTTP/SHA256 and downloaded menu passed; direct QEMU load, not firmware TFTP | Not qualified |
-| SPARC32 / OpenBIOS SS-5 (V8) | Yes, V8 ELF bootstrap and OpenPROM v2/v3 adapter | 12,244 passed | Serial menu passed; firmware network path is not qualified | Not implemented or qualified |
-| HPPA / PDC B160L | Yes, narrow PA-RISC 1.1 | 12,244 passed | Firmware SCSI/PALO boot, PDC console/menu, native Dino/Intel DHCP, HTTP/SHA256 and downloaded menu passed | Not implemented or qualified |
-| IA-64 / experimental EFI Itanium emulator | Yes, PE32+ descriptor entry and native iPXE core | 12,244 passed | Serial input, menu timeout, native Intel DHCP/HTTP/TFTP with SHA256, and HTTP-chained SNP iPXE passed | EFI application chaining passed; OS installation not qualified |
-| PPC64 BE and PPC64 LE / SLOF pseries POWER9 | Separate native 64-bit clients | 12,244 each | Firmware DHCP/TFTP, iPXE DHCP, HTTP/SHA256, menu and serial selection passed | Not qualified |
-| PA-RISC 2.0 / PDC C3700 | Narrow PDC client on the 64-bit CPU; Astro/Elroy PCI | 12,244 passed | SCSI/PALO boot, console/input, native Intel DHCP, HTTP/SHA256 and menu passed | No 64-bit OS handoff qualified |
-| Alpha EV6+ / QEMU DP264 (clipper) | Native 64-bit SRM/OSF PAL client | 12,244 passed | SRM callback console/input, Tsunami PCI + Intel DHCP, HTTP/SHA256 and menu passed; QEMU direct ELF entry | SRM BOOTP wrapper built; initial firmware boot and OS handoff unqualified |
+| Target | Self-tests | Network/menu | Linux handoff |
+|---|---|---|---|
+| SPARC32 / OpenBIOS SS-5, V8 | 13,306 | Native SBus LANCE, OpenPROM DVMA, DHCP/HTTP/SHA256 and downloaded menu | Not implemented |
+| SPARC64 / OpenBIOS sun4u | 13,306 | Sabre PCI/Intel, DHCP/HTTP/SHA256 and downloaded menu | Gentoo live shell; kernel/initramfs fetched by iPXE |
+| PPC32 / SLOF pseries POWER9 | 13,306 | Firmware TFTP, iPXE DHCP/HTTP/SHA256/menu | Gentoo PPC32 live shell on Mac99/G4 |
+| PPC64 BE / SLOF pseries POWER9 | 13,306 | Firmware TFTP, iPXE DHCP/HTTP/SHA256/menu | Gentoo ibmpower live shell |
+| PPC64 LE / SLOF pseries POWER9 | 13,306 | Firmware TFTP, iPXE DHCP/HTTP/SHA256/menu | Gentoo PPC64LE live shell |
+| PowerMac / OpenBIOS Mac99, 970 | Native PPC64 BE; additional Mac99 self-test coverage | Native UniNorth/U3 PCI/Intel | Gentoo live shell through framebuffer/keyboard; official PPC64 serial driver is a module |
+| HPPA / PDC B160L | 13,306 | SCSI/PALO, Dino/Intel DHCP/HTTP/SHA256/menu | Gentoo PA1.1 live shell |
+| PA-RISC 2.0 / PDC C3700 | Narrow PDC client; Astro/Elroy PCI | SCSI/PALO and native Intel | Genuine ELF64 Linux kernel/initramfs entry; see release evidence for live userspace |
+| Alpha EV6+ / QEMU clipper | 13,306 | Tsunami/Intel DHCP/HTTP/SHA256/menu; direct SRM ELF bootstrap | Gentoo Alpha live shell |
+| IA-64 / separate experimental EFI emulator | 13,306 | Intel/SNP network and EFI application chaining | OS kernel handoff not qualified |
 
 There is no physical-hardware qualification. These binaries have not replaced
-the operational PC, JavaStation, HPPA or Solaris boot files. A running iPXE
-menu does not qualify Linux, Solaris, HP-UX or Mezereon kernel loading.
+the operational PC, JavaStation, HPPA or Solaris boot files. Linux qualification is limited to the exact cases above. Solaris, HP-UX and
+Mezereon kernel handoffs through these new clients remain unqualified.
 
 The SPARC64 bootstrap currently uses virtual/physical address `0x40004000`
 to match the QEMU OpenBIOS direct-kernel entry. Its QEMU fixture therefore
@@ -321,3 +322,72 @@ failed earlier attempts remain separate. All eight native architecture
 self-test runs pass 12,244 checks each; x86-64/Linux passes 12,364. The
 separate IA64 emulator remains necessary. No physical hardware or Linux,
 Solaris, HP-UX, OpenVMS or Mezereon handoff is claimed for these ports.
+
+
+## Native network and Linux handoff (r5, 2026-10-17)
+
+The main emulator used for r5 is `/opt/qemu/11.1.2/bin`. Stock 11.1.2 also
+runs the SPARC V8 tests; the earlier 10.1 division workaround is unnecessary
+for this test version. IA-64 still requires the separate experimental fork.
+The x86-64/Linux test image passes 13,426 assertions. The native targets each
+pass 13,306, including 1,062 new ELF parser assertions.
+
+`native_elf_parse()` decodes ELF32/ELF64 in either byte order, rejects truncated
+headers/tables/segments, arithmetic overflow, overlapping destination ranges
+and entry points in BSS. It does not execute images itself. The architecture
+adapters select their machine type and validate/reserve the destinations.
+
+The PowerPC loader preserves the original firmware callback and entry mode.
+It reserves kernel and initramfs separately, outside the low RAM overwritten
+by Linux's relocation. PPC32 also keeps the initramfs/device tree below its
+initial 256 MiB BAT mapping. PPC64 BE and LE take the real 32-bit BE firmware
+entry required by `prom_init`. Mac99 G5 testing uses the ELF32 container for
+the native 64-bit client and the normal ELF64 Gentoo kernel.
+
+Alpha uses the aboot Linux parameter-page contract and a firmware-described
+HWRPB RAM range for external image storage. Kernel segments that overlap the
+loader or downloaded images are rejected. This is not a general relocating
+Alpha loader. The low-memory Linux segments and the EV6+ SRM/PAL environment
+used by the current Gentoo image are the qualified combination.
+
+HPPA keeps a separate external image heap in confirmed contiguous PAGE0 RAM
+on machines with at least 256 MiB. A position-independent, stack-free copy
+trampoline avoids executing from the low memory overwritten by Linux.
+Linux's initial command line lives in a checked low-memory region. Both the
+32-bit and 64-bit Linux virtual address windows are translated using PALO's
+low-physical-memory convention. The client and PDC calls remain narrow even
+when the guest OS kernel switches to wide mode on PA-RISC 2.0.
+
+SPARC64 uses physical-bypass ASIs for the Sabre PCI configuration and Intel
+MMIO. The host model and register address must match. Direct DMA is enabled
+only while the client owns the adapter; the original IOMMU control is
+restored before kernel entry. The Linux adapter uses HdrS 3.01 parameters,
+reserves its ELF destination and keeps the initramfs in low RAM. The initial
+high-initramfs experiment reached userspace but emitted RSS-counter bugs;
+the low-memory version is the qualified candidate. SPARC32 uses its own
+polled Am7990 driver, with OpenPROM/OpenBIOS DMA allocation/mapping and an
+8 KiB buffer bounded by compile-time ring-alignment and size assertions.
+It does not turn OpenBIOS into a firmware network bootloader.
+
+The OS proof uses real HTTP downloads of official Gentoo ELF and initramfs,
+then requires an executed guest command and a marker on its own output line.
+The marker in an echoed command is insufficient. The live root filesystem is
+provided by an attached **read-only official ISO**, with writes in guest RAM.
+These results qualify the native kernel entry, not a complete network root
+profile or a disk installation. No host disk is attached to these guests.
+For the G5 kernel without a built-in serial console, the test records a
+framebuffer dump, OCR text and keyboard-entered command output.
+
+Example (use an architecture-compatible ELF and a separately available root):
+
+```ipxe
+kernel http://server/kernel console=... <root arguments>
+initrd --name initrd http://server/initramfs
+boot
+```
+
+Reproduce with `tools/test-native-linux.py --help`. The recorded command JSON,
+SHA256 values, serial logs and (where used) framebuffer proof are under
+`/data/netboot/tests/ipxe-fork/r5-*`. SPARC32 Linux entry, Solaris/HP-UX/OpenVMS
+entry, real SRM BOOTP, general OpenBoot bootstrap containers, physical hardware
+and complete native network-root profiles remain separate milestones.

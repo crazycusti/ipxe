@@ -14,6 +14,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define REBOOT_NULL
 #if defined ( __powerpc__ ) || defined ( __powerpc64__ )
 #define PCIAPI_OFPCI
+#elif defined ( __sparc__ ) && defined ( __arch64__ )
+#define PCIAPI_SABRE
 #else
 #define PCIAPI_NULL
 #endif

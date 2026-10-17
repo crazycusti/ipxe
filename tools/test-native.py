@@ -35,8 +35,6 @@ def main():
     parser.add_argument('--debug', help='Comma-separated iPXE debug objects')
     parser.add_argument('--trace', action='store_true', help='Capture bounded QEMU exception tracing')
     args = parser.parse_args()
-    if args.kind in ['network', 'deployed-menu'] and args.architecture in ['sparc32', 'sparc64']:
-        raise SystemExit('Network qualification is not available for this target yet.')
     if args.kind == 'deployed-menu' and not args.binary:
         parser.error('deployed-menu requires --binary')
     args.output = args.output.resolve()
@@ -107,9 +105,9 @@ exit
                 subprocess.run(build, check=True, stdout=log, stderr=subprocess.STDOUT)
             shutil.copy2(ROOT / 'src' / ('bin-' + args.architecture + '-' + platform) / target, binary)
         if args.architecture == 'sparc64':
-            command = ['qemu-system-sparc64', '-M', 'sun4u', '-m', '2048', '-kernel', str(binary), '-nic', 'none']
+            command = ['qemu-system-sparc64', '-M', 'sun4u', '-m', '2048', '-kernel', str(binary), '-nic', 'user,id=net0,model=e1000' if args.kind in ['network', 'deployed-menu'] else 'none']
         elif args.architecture == 'sparc32':
-            command = ['qemu-system-sparc', '-M', 'SS-5', '-m', '128', '-kernel', str(binary), '-nic', 'none']
+            command = ['qemu-system-sparc', '-M', 'SS-5', '-m', '128', '-kernel', str(binary), '-nic', 'user,id=net0,model=lance' if args.kind in ['network', 'deployed-menu'] else 'none']
         elif args.architecture == 'alpha':
             command = ['qemu-system-alpha', '-M', 'clipper', '-m', '256', '-kernel', str(binary),
                        '-nic', 'user,id=net0,model=e1000' if args.kind in ['network', 'deployed-menu'] else 'none']

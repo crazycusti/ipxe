@@ -12,3 +12,6 @@ SRCDIRS := $(filter-out drivers/%,$(SRCDIRS))
 DRIVERS_none := platform
 
 DRIVERS_ipxe += ofnet
+
+SRCS += drivers/bus/pci.c drivers/bus/pci_settings.c drivers/net/intel.c drivers/nvs/nvs.c
+DRIVERS_ipxe += intel pci

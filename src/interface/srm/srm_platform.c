@@ -88,11 +88,28 @@ static void *srm_urealloc ( void *ptr, size_t size )
 }
 PROVIDE_UMALLOC ( srm, urealloc, srm_urealloc );
 
+/* HWRPB memory descriptors distinguish usable RAM from firmware pages. */
+int srm_ram_range ( unsigned long start, size_t len ) {
+ volatile unsigned long *h = (void *)0x10000000UL, *map, *cluster;
+ unsigned long i, base, bytes;
+ if ( !len || start > ~0UL - len || h[25] > 0x1000000 ) return 0;
+ map = (void *)( (unsigned long)h + h[25] );
+ if ( map[2] > 64 ) return 0;
+ for ( i = 0; i < map[2]; i++ ) {
+  cluster = map + 3 + i * 7;
+  if ( cluster[6] || cluster[0] > ( ~0UL >> 13 ) || cluster[1] > ( ~0UL >> 13 ) ) continue;
+  base = cluster[0] << 13; bytes = cluster[1] << 13;
+  if ( start >= base && start - base <= bytes && len <= bytes - ( start - base ) ) return 1;
+ }
+ return 0;
+}
 extern int main ( void );
 void srm_platform_start ( void )
 {
 	srm_init ();
 	heap_populate ( &image_heap, image_area, sizeof ( image_area ) );
+	if ( srm_ram_range ( 0x04000000, 0x08000000 ) )
+		heap_populate ( &image_heap, phys_to_virt ( 0x04000000 ), 0x08000000 );
 	printf ( "\nSRM alpha platform entry ready\n" );
 	main ();
 }

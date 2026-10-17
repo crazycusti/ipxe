@@ -11,6 +11,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static long ( *of_entry ) ( struct of_args * );
 static of_cell_t of_stdin, of_stdout;
 static int of_pending = -1;
+unsigned long of_client_entry ( void ) { return (unsigned long)of_entry; }
+#if defined ( __powerpc__ ) || defined ( __powerpc64__ )
+unsigned long of_client_msr ( void ) {
+#ifdef __powerpc64__
+ extern unsigned long of_firmware_msr;
+ return of_firmware_msr;
+#else
+ unsigned long msr;
+ __asm__ volatile ( "mfmsr %0" : "=r" ( msr ) );
+ return msr;
+#endif
+}
+#endif
 
 #ifdef __powerpc64__
 extern int of_arch_invoke ( struct of_args *, unsigned long );

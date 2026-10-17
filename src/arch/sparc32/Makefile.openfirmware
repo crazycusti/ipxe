@@ -7,3 +7,4 @@ $(BIN)/%.of : $(BIN)/%.of.tmp
 LDFLAGS += --undefined=_of_start
 DRIVERS_none := platform openprom
 DRIVERS_ipxe += ofnet openprom
+DRIVERS_ipxe += sunlance

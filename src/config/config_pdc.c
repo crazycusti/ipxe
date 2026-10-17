@@ -2,4 +2,5 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #ifdef PLATFORM_pdc
 PROVIDE_REQUIRING_SYMBOL ();
 REQUIRE_OBJECT ( pdc_platform );
+REQUIRE_OBJECT ( pdc_linux );
 #endif

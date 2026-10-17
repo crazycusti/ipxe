@@ -40,6 +40,9 @@ struct prom_vector {
 	int ( *write ) ( int, const void *, unsigned int );
 };
 static struct prom_vector *prom;
+void openprom_eval ( const char *command ) {
+ ( (void (*)(const char *))prom->eval ) ( command );
+}
 #define PROM_CHOSEN 0x7ffffffe
 
 /* OpenPROM predates /chosen: use its authoritative v2 boot arguments. */

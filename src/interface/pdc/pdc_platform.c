@@ -109,8 +109,20 @@ static struct heap image_heap = {
     .align = 16,
     .ptr_align = 4096,
 };
+static struct heap external_heap = {
+    .blocks = LIST_HEAD_INIT ( external_heap.blocks ),
+    .align = 16,
+    .ptr_align = 4096,
+};
 static void *pdc_urealloc ( void *ptr, size_t size )
 {
+	void *result;
+	if ( ptr && ptr != NOWHERE )
+		return heap_realloc ( ( (unsigned long)ptr >= 0x04000000 &&
+				       (unsigned long)ptr < 0x0c000000 ) ?
+				      &external_heap : &image_heap, ptr, size );
+	result = heap_realloc ( &external_heap, ptr, size );
+	if ( result ) return result;
 	return heap_realloc ( &image_heap, ptr, size );
 }
 PROVIDE_UMALLOC ( pdc, urealloc, pdc_urealloc );
@@ -119,6 +131,10 @@ extern int main ( void );
 void pdc_platform_start ( void )
 {
 	heap_populate ( &image_heap, image_area, sizeof ( image_area ) );
+	/* PAGE0 describes contiguous RAM. Keep external images well above
+	 * the loader and the low-memory Linux decompressor destination. */
+	if ( *(volatile uint32_t *)0x350 >= 0x10000000 )
+		heap_populate ( &external_heap, (void *)0x04000000, 0x08000000 );
 	printf ( "\nPDC hppa platform entry ready\n" );
 	main ();
 }
