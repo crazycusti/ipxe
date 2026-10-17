@@ -70,7 +70,8 @@ void mdhash_update ( struct digest_algorithm *digest, void *ctx,
 	size_t digestsize = mdhash->digestsize;
 	mdhash_context_t ( digestsize, blocksize ) *context = ctx;
 	const uint8_t *byte = data;
-	uint8_t copy[digestsize];
+	/* Compression functions consume this as an array of native words. */
+	uint8_t copy[digestsize] __attribute__ (( aligned ( __alignof__ ( uint64_t ) ) ));
 	unsigned int toggle;
 	unsigned int mask;
 	size_t offset;

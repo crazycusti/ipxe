@@ -22,7 +22,7 @@ FILE_SECBOOT ( PERMITTED );
 		  "\nembedded_image_" #_index "_data:\n\t"		\
 		  ".incbin \"" _path "\"\n\t"				\
 		  "\nembedded_image_" #_index "_end:\n\t"		\
-		  ".equ embedded_image_" #_index "_len, "		\
+		  ".set embedded_image_" #_index "_len, "		\
 			"( embedded_image_" #_index "_end - "		\
 			"  embedded_image_" #_index "_data )\n\t"	\
 		  ".byte 0\n\t" /* NUL */				\

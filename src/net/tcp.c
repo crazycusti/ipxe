@@ -161,7 +161,7 @@ struct tcp_rx_queued_header {
 	uint8_t flags;
 	/** Reserved */
 	uint8_t reserved[3];
-};
+} __attribute__ (( packed ));
 
 /**
  * List of registered TCP connections

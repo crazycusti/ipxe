@@ -649,7 +649,9 @@ void * heap_realloc ( struct heap *heap, void *old_ptr, size_t new_size ) {
 static struct heap heap = {
 	.blocks = LIST_HEAD_INIT ( heap.blocks ),
 	.align = MIN_MEMBLOCK_ALIGN,
-	.ptr_align = sizeof ( void * ),
+	/* Some 32-bit ABIs require 64-bit members to be eight-byte aligned. */
+	.ptr_align = ( __alignof__ ( uint64_t ) > sizeof ( void * ) ?
+		       __alignof__ ( uint64_t ) : sizeof ( void * ) ),
 	.grow = discard_cache,
 };
 

@@ -346,7 +346,8 @@ static void gcm_process ( struct cipher_algorithm *cipher, void *ctx,
 	gcm_context_t ( cipher->ctxsize ) *context = ctx;
 	unsigned int flags = context->gcm.flags;
 	union gcm_block tmp;
-	uint64_t *total;
+	void *total;
+	uint64_t total_bits;
 	size_t frag_len;
 	unsigned int block;
 
@@ -359,7 +360,10 @@ static void gcm_process ( struct cipher_algorithm *cipher, void *ctx,
 	/* Update total length (in bits) */
 	total = ( ( dst || ( flags & GCM_FL_IV ) ) ?
 		  &context->gcm.len.len.data : &context->gcm.len.len.add );
-	*total += ( len * 8 );
+	/* The length pair is packed and may be only byte-aligned. */
+	memcpy ( &total_bits, total, sizeof ( total_bits ) );
+	total_bits += ( len * 8 );
+	memcpy ( total, &total_bits, sizeof ( total_bits ) );
 
 	/* Process data */
 	for ( ; len ; src += frag_len, len -= frag_len, block++ ) {

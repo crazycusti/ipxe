@@ -96,10 +96,10 @@
  */
 #ifdef ASSEMBLY
 #define REQUEST_SYMBOL( symbol )				\
-	.equ __request_ ## symbol, symbol
+	.set __request_ ## symbol, symbol
 #else
 #define REQUEST_SYMBOL( symbol )				\
-	__asm__ ( ".equ __request_" #symbol ", " #symbol )
+	__asm__ ( ".set __request_" #symbol ", " #symbol )
 #endif
 
 /**
@@ -135,10 +135,10 @@
  */
 #ifdef ASSEMBLY
 #define REQUIRING_SYMBOL( symbol )				\
-	.equ __requiring_symbol__, symbol
+	.set __requiring_symbol__, symbol
 #else
 #define REQUIRING_SYMBOL( symbol )				\
-	__asm__ ( ".equ __requiring_symbol__, " #symbol )
+	__asm__ ( ".set __requiring_symbol__, " #symbol )
 #endif
 
 /**
