@@ -13,4 +13,5 @@ struct native_elf {
  struct native_elf_segment segment[NATIVE_ELF_SEGMENTS];
 };
 int native_elf_parse ( struct image *, struct native_elf * );
+int native_elf_netbsd32 ( struct image * );
 #endif

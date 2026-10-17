@@ -4,6 +4,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include <ipxe/openfirmware.h>
 
 struct prom_nodes {
@@ -40,6 +41,50 @@ struct prom_vector {
 	int ( *write ) ( int, const void *, unsigned int );
 };
 static struct prom_vector *prom;
+unsigned long openprom_vector ( void ) { return (unsigned long)prom; }
+int openprom_linux_command ( const char *command ) {
+ if ( !prom->bootargs ) return -1;
+ *(const char **)prom->bootargs = command;
+ return 0;
+}
+int openprom_ram_available ( uint32_t start, uint32_t size ) {
+ struct memory_range { struct memory_range *next; uint32_t start, size; } *range;
+ unsigned int count;
+ int root=prom->nodes->next(0), node, length;
+ uint32_t available[96], address_cells=2, size_cells=1;
+ char name[64];
+ if ( size > ~0U - start ) return 0;
+ /* Direct OpenBIOS entry leaves the v0 list unset. The live device-tree
+  * property also reflects allocations made after the initial PROM handoff. */
+ for ( node=prom->nodes->child(root),count=0; node!=0 && node!=-1 && count<128; node=prom->nodes->next(node),count++ ) {
+  memset(name,0,sizeof(name));length=prom->nodes->length(node,"name");
+  if ( length<=0 || length>=(int)sizeof(name) ) continue;
+  if ( prom->nodes->get(node,"name",name)<0 ) continue;
+  if ( strcmp(name,"memory") ) continue;
+  if ( prom->nodes->length(root,"#address-cells")==4 ) prom->nodes->get(root,"#address-cells",&address_cells);
+  if ( prom->nodes->length(root,"#size-cells")==4 ) prom->nodes->get(root,"#size-cells",&size_cells);
+  if ( address_cells<1 || address_cells>2 || size_cells<1 || size_cells>2 ) return 0;
+  length=prom->nodes->length(node,"available");
+  if ( length<=0 || length>(int)sizeof(available) || length%((address_cells+size_cells)*4) ) return 0;
+  if ( prom->nodes->get(node,"available",available)!=length ) return 0;
+  for ( count=0; count<(unsigned int)length/4; ) {
+   uint64_t address=0, bytes=0;unsigned int i;
+   for(i=0;i<address_cells;i++)address=(address<<32)|available[count++];
+   for(i=0;i<size_cells;i++)bytes=(bytes<<32)|available[count++];
+   DBGC(prom,"PROM available %lx+%lx\n",(unsigned long)address,(unsigned long)bytes);
+   if ( start>=address && start-address<=bytes && size<=bytes-(start-address) ) return 1;
+  }
+  return 0;
+ }
+ if ( !prom->memory[2] ) return 0;
+ range=*(struct memory_range **)prom->memory[2];
+ for ( count = 0; range && count < 128; count++, range = range->next ) {
+  DBGC ( prom, "PROM RAM %lx+%lx request %lx+%lx\n", (unsigned long)range->start, (unsigned long)range->size, (unsigned long)start, (unsigned long)size );
+  if ( start >= range->start && start - range->start <= range->size &&
+       size <= range->size - ( start - range->start ) ) return 1;
+ }
+ return 0;
+}
 void openprom_eval ( const char *command ) {
  ( (void (*)(const char *))prom->eval ) ( command );
 }

@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('kind', choices=['menu', 'input', 'selftests', 'network', 'snp-network', 'deployed-menu'])
+    p.add_argument('kind', choices=['menu', 'input', 'selftests', 'network', 'snp-network', 'deployed-menu', 'linux'])
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--qemu', required=True)
     p.add_argument('--firmware', type=Path, required=True)
@@ -31,14 +31,23 @@ def main():
     p.add_argument('--seconds', type=int, default=600)
     p.add_argument('--debug')
     p.add_argument('--chain-efi', type=Path)
+    p.add_argument('--iso', type=Path, help='Optional read-only OS live root')
+    p.add_argument('--kernel',type=Path)
+    p.add_argument('--initrd',type=Path)
+    p.add_argument('--rootfs',type=Path)
+    p.add_argument('--grub-dir',type=Path)
+    p.add_argument('--memory',default='512M')
+    p.add_argument('--expected-rootfs',type=Path,help='Published EFI already contains the HTTP root prefix')
     p.add_argument('--trace', action='store_true')
     args = p.parse_args()
-    if args.kind == 'deployed-menu' and not args.chain_efi:
-        p.error('deployed-menu requires --chain-efi')
+    if args.kind in ('deployed-menu','linux') and not (args.chain_efi or args.rootfs):
+        p.error(args.kind+' requires --chain-efi')
+    if args.rootfs and (args.kind!='linux' or not all([args.kernel,args.initrd,args.grub_dir])):
+        p.error('--rootfs needs linux, --kernel, --initrd and --grub-dir')
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=False)
     requests = []
-    network = args.kind in ('network', 'snp-network', 'deployed-menu')
+    network = args.kind in ('network', 'snp-network', 'deployed-menu','linux')
     extra_files = {}
     payload = bytes((i * 29 + 17) & 255 for i in range(16384))
     digest = hashlib.sha256(payload).hexdigest()
@@ -56,9 +65,11 @@ def main():
                 self.send_error(404)
                 return
             self.send_response(200)
-            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Content-Length', str(data.stat().st_size if isinstance(data,Path) else len(data)))
             self.end_headers()
-            self.wfile.write(data)
+            if isinstance(data,Path):
+                with data.open('rb') as source:shutil.copyfileobj(source,self.wfile,1024*1024)
+            else:self.wfile.write(data)
 
         def log_message(self, *_args):
             pass
@@ -67,6 +78,16 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     proc = None
     try:
+        if args.rootfs:
+            url='http://10.0.2.2:'+str(server.server_port)
+            rd=args.output/'network-initrd'
+            metadata=subprocess.check_output(['python3',str(ROOT/'tools/wrap-netboot-initrd.py'),str(args.initrd),str(rd),'--root-url',url+'/root.squashfs','--sha256',hashlib.sha256(args.rootfs.read_bytes()).hexdigest(),'--report-url',url+'/root-verified'],text=True)
+            (args.output/'initrd-provenance.json').write_text(metadata)
+            extra_files.update({'/root.squashfs':args.rootfs,'/root-verified':b''})
+            cfg=args.output/'grub.cfg'
+            cfg.write_text('echo IA64_GRUB_ENTERED\nlinux (memdisk)/gentoo root=/dev/ram0 init=/linuxrc rdinit=/netboot-init looptype=squashfs loop=/netboot-root/image.squashfs.img cdroot console=ttyS0,115200n8\ninitrd (memdisk)/gentoo.igz\necho IA64_GRUB_KERNEL_READY\nboot\n')
+            args.chain_efi=args.output/'linux-http.efi'
+            subprocess.run(['grub-mkstandalone','-O','ia64-efi','-d',str(args.grub_dir),'-o',str(args.chain_efi),'--modules=linux memdisk tar gzio','boot/grub/grub.cfg='+str(cfg),'gentoo='+str(args.kernel),'gentoo.igz='+str(rd)],check=True)
         build = ['make', '-C', str(ROOT / 'src'), '-j8', 'CROSS=' + args.cross]
         target = ('tests' if args.kind == 'selftests' else
                   'intel' if network else 'none') + '.efi'
@@ -87,7 +108,7 @@ def main():
                           'sha256sum tftp_payload\nimgfree tftp_payload\nchain ' + url + '/menu.ipxe || goto failed\n'
                           'echo IA64_NETWORK_OK\nexit\n:failed\n'
                           'echo IA64_TEST_FAILED\nexit 1\n')
-            if args.kind in ('snp-network', 'deployed-menu'):
+            if args.kind in ('snp-network', 'deployed-menu','linux'):
                 stage = args.output / 'snp-stage.efi'
                 if args.chain_efi:
                     shutil.copy2(args.chain_efi, stage)
@@ -125,7 +146,7 @@ def main():
         firmware = args.output / 'firmware.bin'
         shutil.copy2(args.firmware, firmware)
         command = [args.qemu, '-machine', args.machine + ',nvram=none',
-                   '-m', '512M', '-bios', str(firmware),
+                   '-m', args.memory, '-bios', str(firmware),
                    '-drive', 'if=ide,format=raw,snapshot=on,file=' + str(disk),
                    '-nic', 'user,model=e1000,id=net0,tftp=' + str(args.output) if network else 'none',
                    '-display', 'none', '-serial', 'stdio', '-monitor',
@@ -135,6 +156,8 @@ def main():
             (args.output / 'payload.bin').write_bytes(payload)
             command += ['-object', 'filter-dump,id=capture,netdev=net0,file=' +
                         str(args.output / 'network.pcap')]
+        if args.iso:
+            command+=['-drive','if=ide,index=1,format=raw,media=cdrom,readonly=on,file='+str(args.iso)]
         if args.trace:
             command += ['-d', 'int,guest_errors', '-D', str(args.output / 'exceptions.log')]
         (args.output / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
@@ -158,6 +181,13 @@ def main():
                 if args.kind == 'selftests':
                     match = re.search(r'all (\d+) tests passed', clean, re.I)
                     passed = bool(match and int(match.group(1)) >= 12240)
+                elif args.kind == 'linux':
+                    if not sent and ('root@livecd' in clean or 'livecd ~ #' in clean):
+                        proc.stdin.write(b"uname -m; printf '\\nQEMU_IA64_OS_RUNTIME_OK\\n'\r");proc.stdin.flush();sent=True
+                    passed = (sent and 'Linux version ' in clean and
+                              bool(re.search(r'(?:^|\n)QEMU_IA64_OS_RUNTIME_OK\r?\n',clean)) and
+                              '/snp-stage.efi' in requests and
+                              (not args.rootfs or '/root-verified' in requests))
                 elif args.kind == 'deployed-menu':
                     passed = ('IA64 Netboot' in clean and 'IA64_CHAIN_RETURN_OK' in clean and
                               '/snp-stage.efi' in requests)
@@ -181,13 +211,15 @@ def main():
                       firmware_sha256=hashlib.sha256(firmware.read_bytes()).hexdigest(),
                       hardware_verified=False, firmware_network_boot_verified=False,
                       firmware_fat_boot_verified=passed,
-                      operating_system_handoff_verified=False,
+                      operating_system_handoff_verified=passed and args.kind=='linux',
+                      network_root_verified=passed and (bool(args.rootfs) or bool(args.expected_rootfs) and 'NETBOOT_ROOT_VERIFIED' in clean),
+                      expected_root_sha256=hashlib.sha256(args.expected_rootfs.read_bytes()).hexdigest() if args.expected_rootfs else None,
                       console_input_verified=passed and args.kind == 'input',
                       snp_network_verified=passed and args.kind == 'snp-network',
                       efi_program_chain_verified=passed and args.kind in ('snp-network', 'deployed-menu'),
                       deployed_menu_verified=passed and args.kind == 'deployed-menu',
                       chained_efi_sha256=hashlib.sha256((args.output / 'snp-stage.efi').read_bytes()).hexdigest()
-                          if args.kind in ('snp-network', 'deployed-menu') else None)
+                          if args.kind in ('snp-network', 'deployed-menu','linux') else None)
         (args.output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
         print(json.dumps(result), flush=True)
         if not passed:

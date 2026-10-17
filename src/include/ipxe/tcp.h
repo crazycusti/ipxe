@@ -360,7 +360,13 @@ struct tcp_options {
  *
  * We therefore choose a (rounded up) maximum window size of 2048kB.
  */
+#if defined ( __sparc__ ) && !defined ( __arch64__ ) && defined ( PLATFORM_openfirmware )
+/* The OpenPROM LANCE DMA pool permits four receive descriptors. Keep
+ * bursts below that capacity instead of losing most of a large window. */
+#define TCP_MAX_WINDOW_SIZE	4096
+#else
 #define TCP_MAX_WINDOW_SIZE	( 2048 * 1024 )
+#endif
 
 /**
  * Path MTU

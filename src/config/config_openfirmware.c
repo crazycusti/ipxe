@@ -6,5 +6,7 @@ REQUIRE_OBJECT ( platform );
 REQUIRE_OBJECT ( of_linux );
 #elif defined ( __sparc__ ) && defined ( __arch64__ )
 REQUIRE_OBJECT ( sparc_linux );
+#elif defined ( __sparc__ )
+REQUIRE_OBJECT ( sparc32_linux );
 #endif
 #endif

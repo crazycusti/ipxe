@@ -1,0 +1,88 @@
+#!/bin/sh
+# Architecture-neutral prefix for an official Gentoo initramfs.  The kernel,
+# original /init and live SquashFS remain unchanged.  All writes stay in RAM.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+BB=/bin/busybox
+fail() {
+    echo "NETBOOT_ROOT_FAILED: $*"
+    [ ! -f /netboot-modules.log ] || "$BB" cat /netboot-modules.log
+    while :; do "$BB" sh; "$BB" sleep 1; done
+}
+"$BB" mkdir -p /proc /sys /dev /netboot-root
+"$BB" mount -t proc proc /proc 2>/dev/null || :
+"$BB" mount -t sysfs sysfs /sys 2>/dev/null || :
+"$BB" mount -t devtmpfs devtmpfs /dev 2>/dev/null || :
+# Dynamically linked BusyBox wget may resolve its default service before
+# parsing an explicit port. Dracut's minimal image can omit this database.
+if [ ! -e /etc/services ]; then
+    echo 'http 80/tcp' > /etc/services
+    echo 'https 443/tcp' >> /etc/services
+fi
+url= digest= mac= report= debug=
+[ ! -f /netboot.conf ] || . /netboot.conf
+for arg in $("$BB" cat /proc/cmdline); do
+    case "$arg" in
+        netboot.root=*) url=${arg#*=} ;;
+        netboot.sha256=*) digest=${arg#*=} ;;
+        netboot.mac=*) mac=${arg#*=} ;;
+        netboot.report=*) report=${arg#*=} ;;
+        netboot.debug=1) debug=1 ;;
+    esac
+done
+case "$url" in http://*|https://*) ;; *) fail 'missing HTTP root URL' ;; esac
+case "$digest" in *[!0-9a-f]*|'') fail 'invalid SHA256' ;; esac
+[ "${#digest}" = 64 ] || fail 'invalid SHA256 length'
+if [ "$debug" = 1 ]; then exec 1>/dev/kmsg 2>&1; set -x; fi
+# Resolve PCI aliases, including dependencies, using the official module tree.
+for alias in /sys/bus/*/devices/*/modalias; do
+    [ -f "$alias" ] && "$BB" modprobe "$("$BB" cat "$alias")" 2>>/netboot-modules.log
+done
+# Non-PCI workstation NICs; absent modules are harmless.
+for module in sunlance sunhme sungem pmac_zilog virtio_net; do "$BB" modprobe "$module" 2>>/netboot-modules.log; done
+"$BB" mdev -s 2>/dev/null || :
+# Some bus probes run asynchronously after modprobe has returned.
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    found=
+    for device in /sys/class/net/*; do [ "${device##*/}" = lo ] || found=1; done
+    [ "$found" = 1 ] && break
+    "$BB" sleep 1
+done
+cat > /netboot-dhcp <<'EOF'
+#!/bin/sh
+BB=/bin/busybox
+case "$1" in
+    bound|renew)
+        "$BB" ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}" up
+        for gateway in $router; do "$BB" route add default gw "$gateway" dev "$interface" 2>/dev/null; break; done
+        ;;
+esac
+EOF
+"$BB" chmod 700 /netboot-dhcp
+connected=
+for device in /sys/class/net/*; do
+    iface=${device##*/}
+    [ "$iface" = lo ] && continue
+    [ -z "$mac" ] || [ "$("$BB" cat "$device/address")" = "$mac" ] || continue
+    echo "NETBOOT_DHCP: $iface"
+    "$BB" ifconfig "$iface" up
+    if "$BB" udhcpc -i "$iface" -n -q -t 3 -T 3 -s /netboot-dhcp; then connected=1; break; fi
+done
+[ "$connected" = 1 ] || fail 'no working network interface'
+"$BB" mount -t tmpfs -o size=70%,mode=755 tmpfs /netboot-root || fail 'RAM mount'
+echo "NETBOOT_ROOT_FETCH: $url"
+"$BB" wget -O /netboot-root/image.squashfs.img "$url" || fail 'HTTP download'
+echo "$digest  /netboot-root/image.squashfs.img" | "$BB" sha256sum -c - || fail 'root SHA256 mismatch'
+echo NETBOOT_ROOT_VERIFIED
+[ -z "$report" ] || "$BB" wget -q -O /dev/null "$report" || :
+"$BB" umount /sys /proc 2>/dev/null || :
+# Genkernel recognises a pre-existing absolute loop image, but retains its
+# directory in LOOP as well as CDROOT_PATH.  Normalise that existing branch
+# before its later path joins; leave the original script in the archive.
+if [ -f /etc/initrd.defaults ] && "$BB" grep -Fq 'CDROOT_PATH=$(dirname "${LOOP}")' /init; then
+    "$BB" sed '/CDROOT_PATH=$(dirname "${LOOP}")/a\
+\tLOOP=$(basename "${LOOP}")' /init > /netboot-official-init
+    "$BB" chmod 700 /netboot-official-init
+    exec /netboot-official-init "$@"
+fi
+exec /init "$@"
+fail 'official init returned'

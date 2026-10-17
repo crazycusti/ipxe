@@ -391,3 +391,71 @@ SHA256 values, serial logs and (where used) framebuffer proof are under
 `/data/netboot/tests/ipxe-fork/r5-*`. SPARC32 Linux entry, Solaris/HP-UX/OpenVMS
 entry, real SRM BOOTP, general OpenBoot bootstrap containers, physical hardware
 and complete native network-root profiles remain separate milestones.
+
+## HTTP live roots and Sun4m OS entry (r6)
+
+The native Linux fixtures now boot without an attached ISO. A small appended
+initramfs member supplies `netboot-init` and a pinned root URL/SHA256, using
+the official BusyBox and kernel modules. The prefix obtains DHCP, downloads
+SquashFS into guest RAM, verifies its digest, and enters the original init.
+The original compressed initramfs remains the first archive member. Kernel
+code and SquashFS bytes are unchanged; Alpha's official gzip kernel is
+uncompressed before handing its ELF bytes to the native loader.
+
+The genkernel branch needs one path normalisation in a temporary RAM copy of
+`/init`: after recognising an already present absolute loop image, it must
+strip the directory from `LOOP` before joining it with `CDROOT_PATH` again.
+Dracut uses its existing local live-image path. Its profile includes `cdroot`
+so that Gentoo configures the live console. Missing network/display modules
+and dependencies are copied unchanged from the matching official SquashFS;
+no module from a different kernel release is substituted. A missing service
+name database is supplied for dynamically linked BusyBox wget.
+
+`tools/wrap-netboot-initrd.py`, `tools/netboot-modules.py` and
+`tools/netboot-init` reproduce the prefix. `tools/test-native-linux.py`
+checks either a temporary HTTP fixture or an actual published profile.
+`--reject-root` proves that a wrong root digest prevents official init entry.
+There is no writable installation disk in these tests. The existing PC disk
+installation results remain separate from this native live-system milestone.
+
+IA64 chains a GRUB 2.12 standalone EFI image fetched through iPXE. Its memory
+filesystem contains the official kernel and augmented initramfs; the live
+root comes from HTTP. The experimental IA64 emulator now reaches the real
+Gentoo IA64 shell. `tools/test-ia64.py linux` reproduces this path. Its
+firmware FAT entry is still a bootstrap fixture, not a firmware PXE proof.
+
+Sun4m now has a bounded ELF32 adapter for Linux HdrS 2.x and canonical NetBSD
+identity notes. It passes the original OpenPROM vector and uses a stack-free
+copy trampoline outside the overwritten low iPXE image. Destination ranges
+must fit the original low mapping. Linux initrd destinations are selected
+from the current firmware `available` property, with a checked v0 fallback.
+Firmware node handles may have their high bit set and are not signed-positive
+integers. The NetBSD ELF note reader has 162 additional portable assertions,
+including unaligned tables, truncated prefixes and overflowing ranges.
+
+The official NetBSD 11 SPARC microroot reaches a real RAM shell through iPXE
+HTTP on SS-5. This minimal first-stage system lacks ordinary utilities such
+as uname and mount and requests additional installer tools; it is not the
+complete sysinst distribution. Its successful proof executes `/bin/sh -c
+true` after entering the RAM shell. The vintage Debian SPARC32 Linux 2.4.27
+kernel reaches its Zilog driver both from this adapter and from a separate
+direct QEMU baseline, then stalls there. That is not a completed Linux boot.
+Modern large SPARC32 Linux kernels and other OpenPROM models need further
+loader/mapping work and are not qualified by this small-kernel fixture.
+
+SPARC32's four-entry LANCE receive ring cannot absorb a 2 MiB TCP burst.
+Its platform receive window is capped at 4 KiB, avoiding repeated packet
+losses during multi-megabyte transfers. Other architectures retain their
+existing window size. The eight native targets now each pass 13,468
+assertions; x86-64/Linux passes 13,588.
+
+Published private-LAN live profiles are under
+`/data/ipxe/netboot/media/gentoo-native-r6/`; the persistent menu renderer
+exposes their architecture/model choices. ISO signatures and SHA512 are
+rechecked before extraction by `/home/wynton/netboot/gentoo_native_publish.py`.
+The model-dependent first firmware bootstrap, supported physical NICs,
+low-memory cases and real hardware still need their own qualification.
+The Intel PCI NIC fixtures do not implement the onboard HP 712 LAN,
+PowerMac Sungem or Sun HME drivers inside iPXE. Solaris/HP-UX/OpenVMS and
+Mezereon transitions through these new clients are separate OS adapters;
+the existing firmware-native boot profiles are retained.

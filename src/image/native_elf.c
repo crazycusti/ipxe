@@ -11,6 +11,26 @@ static uint64_t number ( const unsigned char *p, unsigned int bytes, int le ) {
  for ( i = 0; i < bytes; i++ ) n = ( n << 8 ) | p[le ? bytes - 1 - i : i];
  return n;
 }
+/* A canonical NetBSD identity note in a bounded ELF32 big-endian section
+ * table. Read fields bytewise: downloaded offsets need not be aligned. */
+int native_elf_netbsd32 ( struct image *image ) {
+ const unsigned char *data=image->data, *section;
+ uint32_t offset, size, start;
+ unsigned int count, i;
+ static const unsigned char ident[20]={0,0,0,7,0,0,0,4,0,0,0,1,'N','e','t','B','S','D',0,0};
+ if ( image->len<52 || memcmp(data,"\177ELF",4) || data[4]!=1 || data[5]!=2 ) return 0;
+ offset=number(data+32,4,0);count=number(data+48,2,0);
+ if ( number(data+46,2,0)!=40 || count>128 || offset>image->len ||
+      count>(image->len-offset)/40 ) return 0;
+ for ( i=0; i<count; i++ ) {
+  section=data+offset+i*40;
+  if ( number(section+4,4,0)!=7 ) continue;
+  start=number(section+16,4,0);size=number(section+20,4,0);
+  if ( start>image->len || size>image->len-start ) return 0;
+  if ( size>=24 && !memcmp(data+start,ident,sizeof(ident)) ) return 1;
+ }
+ return 0;
+}
 int native_elf_parse ( struct image *image, struct native_elf *elf ) {
  const unsigned char *data = image->data, *p;
  uint64_t off, entsize, count, i, j;

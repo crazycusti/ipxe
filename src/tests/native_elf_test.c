@@ -59,6 +59,23 @@ static void native_elf_test_exec ( void ) {
    ok ( native_elf_parse ( &image, &elf ) != 0 );
   }
  }
+ /* NetBSD notes: every truncated prefix, unaligned table, and hostile range. */
+ memset(data,0,sizeof(data));memcpy(data,"\177ELF",4);data[4]=1;data[5]=2;
+ put(data+32,65,4,0);put(data+46,40,2,0);put(data+48,1,2,0);
+ put(data+69,7,4,0);put(data+81,129,4,0);put(data+85,24,4,0);
+ put(data+129,7,4,0);put(data+133,4,4,0);put(data+137,1,4,0);
+ memcpy(data+141,"NetBSD",7);memcpy(good,data,sizeof(data));
+ ok(native_elf_netbsd32(&image));
+ for(i=0;i<153;i++){image.len=i;ok(!native_elf_netbsd32(&image));}
+ image.len=sizeof(data);
+ put(data+32,~0U,4,0);ok(!native_elf_netbsd32(&image));memcpy(data,good,sizeof(data));
+ put(data+48,129,2,0);ok(!native_elf_netbsd32(&image));memcpy(data,good,sizeof(data));
+ put(data+46,39,2,0);ok(!native_elf_netbsd32(&image));memcpy(data,good,sizeof(data));
+ put(data+81,~0U,4,0);ok(!native_elf_netbsd32(&image));memcpy(data,good,sizeof(data));
+ put(data+85,~0U,4,0);ok(!native_elf_netbsd32(&image));memcpy(data,good,sizeof(data));
+ put(data+85,23,4,0);ok(!native_elf_netbsd32(&image));memcpy(data,good,sizeof(data));
+ data[141]='X';ok(!native_elf_netbsd32(&image));memcpy(data,good,sizeof(data));
+ data[4]=2;ok(!native_elf_netbsd32(&image));
 }
 struct self_test native_elf_test __self_test = {
  .name = "native_elf", .exec = native_elf_test_exec,
