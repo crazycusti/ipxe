@@ -47,6 +47,10 @@ exit
                     '-drive', 'if=pflash,format=raw,file=' + str(out / 'vars.fd')]
     (out / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
     passed = False
+    marker = 'PC_MENU_OK'
+    # OVMF may send EFI console output to the same UART as iPXE's serial
+    # console, duplicating each character. Keep the raw log as evidence.
+    markers = [marker, ''.join(c * 2 for c in marker)]
     with (out / 'qemu.log').open('wb') as log:
         proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
         try:
@@ -54,7 +58,7 @@ exit
             while proc.poll() is None and time.monotonic() < end:
                 time.sleep(.25)
                 serial = out / 'serial.log'
-                if serial.exists() and 'PC_MENU_OK' in serial.read_text(errors='replace'):
+                if serial.exists() and any(m in serial.read_text(errors='replace') for m in markers):
                     passed = True
                     break
         finally:
