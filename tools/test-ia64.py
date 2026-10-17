@@ -38,8 +38,10 @@ def main():
     p.add_argument('--grub-dir',type=Path)
     p.add_argument('--memory',default='512M')
     p.add_argument('--expected-rootfs',type=Path,help='Published EFI already contains the HTTP root prefix')
+    p.add_argument('--binary',type=Path,help='Run an exact existing self-test EFI binary')
     p.add_argument('--trace', action='store_true')
     args = p.parse_args()
+    if args.binary and args.kind!='selftests':p.error('--binary is only supported for selftests')
     if args.kind in ('deployed-menu','linux') and not (args.chain_efi or args.rootfs):
         p.error(args.kind+' requires --chain-efi')
     if args.rootfs and (args.kind!='linux' or not all([args.kernel,args.initrd,args.grub_dir])):
@@ -131,10 +133,11 @@ def main():
             build.append('EMBED=')
         build.append('bin-ia64-efi/' + target)
         (args.output / 'build-command.json').write_text(json.dumps(build, indent=2) + '\n')
-        with (args.output / 'build.log').open('wb') as log:
-            subprocess.run(build, check=True, stdout=log, stderr=subprocess.STDOUT)
+        if not args.binary:
+            with (args.output / 'build.log').open('wb') as log:
+                subprocess.run(build, check=True, stdout=log, stderr=subprocess.STDOUT)
         binary = args.output / target
-        shutil.copy2(ROOT / 'src/bin-ia64-efi' / target, binary)
+        shutil.copy2(args.binary if args.binary else ROOT / 'src/bin-ia64-efi' / target, binary)
         disk = args.output / 'boot.fat'
         with disk.open('wb') as f:
             f.truncate(64 * 1024 * 1024)
