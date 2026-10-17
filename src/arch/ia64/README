@@ -1,0 +1,31 @@
+IA-64 EFI port
+==============
+
+Build with an IA-64 ELF GNU toolchain that still supports Itanium (for
+example kernel.org's GCC 12.2 nolibc cross compiler and binutils 2.39):
+
+  make CROSS=/path/to/ia64-linux- bin-ia64-efi/snp.efi
+  make CROSS=/path/to/ia64-linux- bin-ia64-efi/intel.efi
+  make CROSS=/path/to/ia64-linux- bin-ia64-efi/tests.efi
+
+The standard deployment is SNP: iPXE uses EFI firmware's network driver.
+intel.efi is a native-driver alternative and an emulator bootstrap fixture.
+This target advertises DHCP architecture 2 (EFI Itanium), not x86-64.
+
+EFI PE32+ entry is a two-word descriptor (code address, GP). The GNU-EFI
+startup and relocator were imported from ncroxon/gnu-efi revision
+87162316d1d04a12d5cc54f77bb7df117b73b146. Their original Hewlett-Packard
+BSD notices are retained. The linker layout is adapted from the same
+project's IA-64 EFI linker script. setjmp.S is adapted from GNU-EFI's
+Intel BSD implementation: the return branch is saved explicitly and a
+zero longjmp value is converted to one. GNU assembler inserts instruction
+group stops in automatic dependency mode.
+
+Local changes canonicalize relocated function descriptors by address.
+This preserves C function-pointer equality, including aliases; iPXE uses
+function pointers as interface operation IDs. A dedicated self-test also
+checks indirect calls and globals through both descriptors.
+
+This is an unsigned experimental port. EFI application chaining is
+verified; no OS-specific IA-64 ELF loader or complete installation is
+claimed. There is no physical Itanium hardware qualification yet.

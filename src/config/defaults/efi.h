@@ -46,6 +46,11 @@ FILE_SECBOOT ( PERMITTED );
 #define FDT_EFI
 #endif
 
+#if defined ( __ia64__ )
+#define IOAPI_IA64
+#define FDT_NULL
+#endif
+
 #if defined ( __riscv )
 #define IOAPI_RISCV
 #define FDT_EFI

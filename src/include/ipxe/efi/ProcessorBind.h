@@ -31,6 +31,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EFIARCH RiscV64
 #endif
 
+#if defined ( __ia64__ )
+#define EFIARCH Ia64
+#endif
+
 /* Determine architecture-specific ProcessorBind.h path */
 #define PROCESSORBIND(_arch) <ipxe/efi/_arch/ProcessorBind.h>
 

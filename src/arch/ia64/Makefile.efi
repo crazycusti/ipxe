@@ -1,0 +1,11 @@
+# IA-64 EFI uses function descriptors, a GP-relative GOT and ELF runtime
+# relocations. GNU-EFI startup relocates the image before calling iPXE.
+LDSCRIPT = arch/ia64/scripts/efi.lds
+LDFLAGS += -shared -Bsymbolic --no-undefined -z nocombreloc
+NON_AUTO_MEDIA += efi
+DRIVERS_none := efiprefix
+DRIVERS_ipxe += $(DRIVERS_efi_net)
+override TGT_LD_ENTRY = _start_plabel
+$(BIN)/%.efi : $(BIN)/%.efi.tmp
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(OBJCOPY) -j .text -j .sdata -j .data -j .dynamic -j .rela -j .rela.plt -j .reloc -j .dynsym -j .dynstr -j .sbat -j .sbom --target=efi-app-ia64 $< $@

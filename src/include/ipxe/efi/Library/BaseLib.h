@@ -21,6 +21,15 @@ FILE_SECBOOT ( PERMITTED );
 //
 // Definitions for architecture-specific types
 //
+#if defined (MDE_CPU_IPF)
+/* IA-64 ABI spill-format floating registers and saved machine state. */
+typedef struct {
+  UINT64 Fp[40];
+  UINT64 State[18];
+} __attribute__((aligned(16))) BASE_LIBRARY_JUMP_BUFFER;
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 16
+#endif
+
 #if   defined (MDE_CPU_IA32)
 ///
 /// The IA-32 architecture context buffer used by SetJump() and LongJump().

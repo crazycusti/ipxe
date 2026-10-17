@@ -66,6 +66,7 @@ REQUIRE_OBJECT ( dns_test );
 REQUIRE_OBJECT ( uri_test );
 REQUIRE_OBJECT ( profile_test );
 REQUIRE_OBJECT ( setjmp_test );
+REQUIRE_OBJECT ( function_test );
 REQUIRE_OBJECT ( pccrc_test );
 REQUIRE_OBJECT ( linebuf_test );
 REQUIRE_OBJECT ( iobuf_test );

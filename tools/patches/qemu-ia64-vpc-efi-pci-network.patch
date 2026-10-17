@@ -1,0 +1,32 @@
+diff --git a/roms/ia64-firmware/firmware.c b/roms/ia64-firmware/firmware.c
+index 2328979..409c289 100644
+--- a/roms/ia64-firmware/firmware.c
++++ b/roms/ia64-firmware/firmware.c
+@@ -5007,0 +5008 @@ static EFI_HANDLE mPciLsiHandle;
++static EFI_HANDLE mPciNetHandle;
+@@ -5011 +5012 @@ static EFI_HANDLE mArchitecturalHandle;
+-#define FW_PCI_IO_DEVICE_COUNT 6U
++#define FW_PCI_IO_DEVICE_COUNT 7U
+@@ -11553,0 +11555,3 @@ VOID bs_restore_tpl(EFI_TPL OldTpl)
++    /* This firmware has no asynchronous timer interrupt. Poll at TPL
++     * transitions so EFI applications can use timer notifications. */
++    fw_poll_timers();
+@@ -16753,0 +16758 @@ static void efi_init_static_handles(void)
++    mPciNetHandle = vpc_devices ? (EFI_HANDLE)(UINTN)0x7105 : NULL;
+@@ -25059,0 +25065,3 @@ static FW_PCI_CONTROLLER_DEVICE_PATH mPciLsiDevicePath =
++static FW_PCI_CONTROLLER_DEVICE_PATH mPciNetDevicePath =
++    FW_PCI_CONTROLLER_DEVICE_PATH_INIT(6);
++
+@@ -33956,0 +33965 @@ static EFI_PCI_IO_PROTOCOL mPciVgaIoProto;
++static EFI_PCI_IO_PROTOCOL mPciNetIoProto;
+@@ -33991,0 +34001,8 @@ static FW_PCI_IO_DEVICE mPciIoDevices[FW_PCI_IO_DEVICE_COUNT] = {
++    /* VPC e1000: expose the existing PCI function through EFI PCI I/O.
++     * This is not an SNP or PXE ROM; the guest still drives the NIC.
++     */
++    {
++        &mPciNetHandle, &mPciNetIoProto, &mPciNetDevicePath,
++        0, 6, 0, FW_PCI_COMMAND_ATTRIBUTES, 0x100e8086U,
++        0, 0xc1040000U, 0x20000, 1, 0, 0,
++    },
+@@ -35545,0 +35563 @@ static EFI_PCI_IO_PROTOCOL mPciVgaIoProto = FW_PCI_IO_PROTOCOL_INIT;
++static EFI_PCI_IO_PROTOCOL mPciNetIoProto = FW_PCI_IO_PROTOCOL_INIT;

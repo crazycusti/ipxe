@@ -1,7 +1,7 @@
 # Experimental iPXE multiarchitecture fork
 
 This fork adds native SPARC32/OpenPROM, SPARC64 and PPC32/IEEE 1275,
-and narrow HPPA/PDC clients.
+narrow HPPA/PDC clients, and an IA-64 EFI client.
 It is intended as a foundation for a shared netboot environment and future
 Mezereon loading. The upstream tree and its licences remain intact.
 
@@ -18,6 +18,7 @@ Initial upstream base: `c51ca76` (the full revision is available with
 | PowerMac / OpenBIOS | Build available | Not qualified on this firmware | No packet-I/O qualification | Not qualified |
 | SPARC32 / OpenBIOS SS-5 (V8) | Yes, V8 ELF bootstrap and OpenPROM v2/v3 adapter | 12,240 passed | Serial menu passed; firmware network path is not qualified | Not implemented or qualified |
 | HPPA / PDC B160L | Yes, narrow PA-RISC 1.1 | 12,240 passed | Firmware SCSI/PALO boot, PDC console/menu, native Dino/Intel DHCP, HTTP/SHA256 and downloaded menu passed | Not implemented or qualified |
+| IA-64 / experimental EFI Itanium emulator | Yes, PE32+ descriptor entry and native iPXE core | 12,244 passed | Serial input, menu timeout, native Intel DHCP/HTTP/TFTP with SHA256, and HTTP-chained SNP iPXE passed | EFI application chaining passed; OS installation not qualified |
 | PPC64 / PPC64LE ELF clients | Separate ABI/entry work required | Pending | A PPC32 SLOF client already runs on a POWER9 machine | Pending |
 
 There is no physical-hardware qualification. These binaries have not replaced
@@ -171,3 +172,66 @@ Tests and assertions are not disabled. `input` verifies actual serial key
 input: it must change away from a deliberately wrong default selection.
 `--trace` bounds QEMU exception logs to 32 MiB; `--debug` enables named iPXE
 objects. The old `test-ieee1275.py` command remains a compatibility launcher.
+
+
+## IA-64 EFI qualification
+
+IA-64 is an EFI target with DHCP architecture ID **2**. It does not require
+identifying a particular Itanium server model before starting the generic
+port. Use `bin-ia64-efi/snp.efi` with firmware SNP for deployment;
+`intel.efi` is the native PCI alternative used to bootstrap the emulator.
+Native firmware drivers, EFI console and EFI application chaining are shared
+with the existing EFI backend. Physical IA-64 hardware remains unqualified.
+
+The entry point is a PE32+ two-word function descriptor. The linker and
+GNU-EFI-derived startup handle the IA-64 GP/GOT, ELF runtime relocations and
+canonical function descriptors. Function-pointer identity, including aliases,
+is required by iPXE's interface dispatch and is explicitly self-tested.
+The imported assembly retains its original BSD notices; provenance is in
+`src/arch/ia64/README`. GNU assembler uses automatic dependency scheduling.
+The EFI entry relocation descriptor is page-aligned. Failed relocations use
+EFI error statuses with the native high bit set.
+
+An IA-64 GCC 12.2 ELF toolchain and binutils 2.39 can build the port:
+
+```sh
+make -C src CROSS=/path/to/ia64-linux- bin-ia64-efi/snp.efi
+make -C src CROSS=/path/to/ia64-linux- bin-ia64-efi/intel.efi
+make -C src CROSS=/path/to/ia64-linux- bin-ia64-efi/tests.efi
+python3 tools/test-ia64.py selftests --output /tmp/ia64-tests --qemu /path/to/qemu-system-ia64 --firmware /path/to/ia64-firmware.bin --cross /path/to/ia64-linux-
+python3 tools/test-ia64.py input --output /tmp/ia64-input --qemu /path/to/qemu-system-ia64 --firmware /path/to/ia64-firmware.bin --cross /path/to/ia64-linux-
+python3 tools/test-ia64.py network --output /tmp/ia64-network --qemu /path/to/qemu-system-ia64 --firmware /path/to/ia64-firmware.bin --cross /path/to/ia64-linux-
+python3 tools/test-ia64.py snp-network --output /tmp/ia64-snp --qemu /path/to/qemu-system-ia64 --firmware /path/to/ia64-firmware.bin --cross /path/to/ia64-linux-
+```
+
+The test emulator is the experimental third-party
+[syunnPC IA-64 QEMU fork](https://github.com/syunnPC/qemu-system-ia64), pinned
+at `9902cf66038403ef8ec3621126b540824c12f12e` (reported QEMU version 11.0.50).
+It is independent of upstream QEMU. Its firmware does not implement PXE/SNP
+network bootstrap, and only enumerated the built-in storage/graphics devices
+through EFI PCI I/O. The fixture patch
+`tools/patches/qemu-ia64-vpc-efi-pci-network.patch` exposes the VPC machine's
+existing e1000 at PCI 00:06.0 and polls its cooperative timer events at TPL
+transitions. This patch changes the **test firmware**, not iPXE's network
+protocols. It is limited to that VPC adapter; it adds no generic firmware PXE
+implementation. Apply with `git apply --unidiff-zero /path/to/qemu-ia64-vpc-efi-pci-network.patch`
+and rebuild the firmware with the pinned IA-64 cross toolchain.
+
+Tests boot a fresh FAT disk through EFI. Disk writes use a temporary overlay;
+no user disk or host network configuration is attached. Native iPXE performs
+DHCP and HTTP. The `snp-network` case downloads a second IA-64 EFI executable,
+starts it through LoadImage/StartImage, and verifies that this second iPXE
+uses the first stage's SNP protocol to obtain DHCP, fetch HTTP and TFTP
+payloads, check both SHA256 values and execute a downloaded menu. A pcap,
+serial logs, copied firmware, hashes and exact commands are retained.
+
+`deployed-menu --chain-efi /path/to/deployed.efi` checks the byte-identical
+installed EFI loader and its actual served menu, including the default return
+to firmware. Full firmware PXE, an operating-system kernel handoff, Secure
+Boot, and a complete Gentoo/HP-UX/OpenVMS installation are **not** qualified by
+these tests. The mirrored IA-64 Gentoo media remains a separate archive.
+
+The added generic function-pointer test also passes on HPPA, SPARC32,
+SPARC64, PPC32 and x86-64. Current native suites have 12,244 checks;
+x86-64/Linux has 12,364. Original r1/r2 evidence records the older suite
+counts before these four additional checks.
