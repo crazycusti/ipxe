@@ -1,0 +1,88 @@
+FILE_LICENCE ( GPL2_OR_LATER );
+.level 1.1
+.text
+.export setjmp,entry
+setjmp:
+ stw %r3,0(%r26)
+ stw %r4,4(%r26)
+ stw %r5,8(%r26)
+ stw %r6,12(%r26)
+ stw %r7,16(%r26)
+ stw %r8,20(%r26)
+ stw %r9,24(%r26)
+ stw %r10,28(%r26)
+ stw %r11,32(%r26)
+ stw %r12,36(%r26)
+ stw %r13,40(%r26)
+ stw %r14,44(%r26)
+ stw %r15,48(%r26)
+ stw %r16,52(%r26)
+ stw %r17,56(%r26)
+ stw %r18,60(%r26)
+ stw %r19,64(%r26)
+ stw %r27,68(%r26)
+ stw %r30,72(%r26)
+ stw %r2,76(%r26)
+ mfsp %sr0,%r1
+ stw %r1,80(%r26)
+ mfsp %sr1,%r1
+ stw %r1,84(%r26)
+ mfsp %sr2,%r1
+ stw %r1,88(%r26)
+ mfsp %sr3,%r1
+ stw %r1,92(%r26)
+ mfsp %sr4,%r1
+ stw %r1,96(%r26)
+ mfsp %sr5,%r1
+ stw %r1,100(%r26)
+ mfsp %sr6,%r1
+ stw %r1,104(%r26)
+ mfsp %sr7,%r1
+ stw %r1,108(%r26)
+ bv %r0(%r2)
+ copy %r0,%r28
+.export longjmp,entry
+longjmp:
+ ldw 80(%r26),%r1
+ mtsp %r1,%sr0
+ ldw 84(%r26),%r1
+ mtsp %r1,%sr1
+ ldw 88(%r26),%r1
+ mtsp %r1,%sr2
+ ldw 92(%r26),%r1
+ mtsp %r1,%sr3
+ ldw 96(%r26),%r1
+ mtsp %r1,%sr4
+ ldw 100(%r26),%r1
+ mtsp %r1,%sr5
+ ldw 104(%r26),%r1
+ mtsp %r1,%sr6
+ ldw 108(%r26),%r1
+ mtsp %r1,%sr7
+ ldw 0(%r26),%r3
+ ldw 4(%r26),%r4
+ ldw 8(%r26),%r5
+ ldw 12(%r26),%r6
+ ldw 16(%r26),%r7
+ ldw 20(%r26),%r8
+ ldw 24(%r26),%r9
+ ldw 28(%r26),%r10
+ ldw 32(%r26),%r11
+ ldw 36(%r26),%r12
+ ldw 40(%r26),%r13
+ ldw 44(%r26),%r14
+ ldw 48(%r26),%r15
+ ldw 52(%r26),%r16
+ ldw 56(%r26),%r17
+ ldw 60(%r26),%r18
+ ldw 64(%r26),%r19
+ ldw 68(%r26),%r27
+ ldw 72(%r26),%r30
+ ldw 76(%r26),%r2
+ copy %r25,%r28
+ comib,<> 0,%r28,1f
+ nop
+ ldi 1,%r28
+1: bv %r0(%r2)
+ nop
+.section .note.GNU-stack,"",@progbits

@@ -1,0 +1,12 @@
+LDSCRIPT = arch/hppa/scripts/pdc.lds
+SRCDIRS += interface/pdc
+SRCDIRS := $(filter-out drivers/%,$(SRCDIRS))
+SRCS += drivers/bus/pci.c drivers/bus/pci_settings.c drivers/net/intel.c drivers/nvs/nvs.c
+NON_AUTO_MEDIA += pdc lif
+$(BIN)/%.pdc : $(BIN)/%.pdc.tmp
+	$(CP) $< $@
+$(BIN)/%.lif : $(BIN)/%.pdc
+	palo -f /dev/null -s $@ -b /usr/share/palo/iplboot -k $< -c '0/vmlinux'
+LDFLAGS += --undefined=_pdc_start
+DRIVERS_none := pdc_platform
+DRIVERS_ipxe := pdc_platform intel pci

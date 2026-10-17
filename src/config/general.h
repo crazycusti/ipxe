@@ -45,7 +45,7 @@ FILE_SECBOOT ( PERMITTED );
 #define DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
 
 /* The initial Open Firmware port has no qualified entropy or wall clock. */
-#if defined ( PLATFORM_openfirmware )
+#if defined ( PLATFORM_openfirmware ) || defined ( PLATFORM_pdc )
   #undef DOWNLOAD_PROTO_HTTPS
 #endif
 //#define DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */

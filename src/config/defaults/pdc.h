@@ -1,0 +1,20 @@
+#ifndef CONFIG_DEFAULTS_PDC_H
+#define CONFIG_DEFAULTS_PDC_H
+FILE_LICENCE ( GPL2_OR_LATER );
+#define IOAPI_OFW
+#define IOMAP_VIRT
+#define UACCESS_FLAT
+#define DMAAPI_FLAT
+#define UMALLOC_PDC
+#define MEMMAP_NULL
+#define NAP_NULL
+#define SMBIOS_NULL
+#define SANBOOT_NULL
+#define TIME_NULL
+#define REBOOT_NULL
+#define PCIAPI_DINO
+#define ACPI_NULL
+#define MPAPI_NULL
+#define SERIAL_NULL
+#define FDT_NULL
+#endif
