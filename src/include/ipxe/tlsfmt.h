@@ -170,6 +170,11 @@ FILE_SECBOOT ( PERMITTED );
 #include <stddef.h>
 #include <ipxe/asn1.h>
 
+/* Wire fields may start at any byte offset.  The alignment belongs to
+ * the referenced integer type, rather than to the pointer variable. */
+typedef uint16_t tls_unaligned_u16 __attribute__ (( aligned ( 1 ), may_alias ));
+typedef uint32_t tls_unaligned_u32 __attribute__ (( aligned ( 1 ), may_alias ));
+
 /** TLS version 1.1 */
 #define TLS_VERSION_TLS_1_1 0x0302
 
@@ -490,7 +495,7 @@ union tls_client_key_exchange {
 /** DigitallySigned descriptor */
 struct tls_digitally_signed {
 	/** Signature and hash algorithm */
-	uint16_t __attribute__ (( aligned ( 1 ) )) *sig_hash;
+	tls_unaligned_u16 *sig_hash;
 	/** Signature */
 	struct tls_cursor sig;
 };
@@ -498,7 +503,7 @@ struct tls_digitally_signed {
 /** Extension descriptor */
 struct tls_extension {
 	/** Extension type */
-	uint16_t __attribute__ (( aligned ( 1 ) )) *type;
+	tls_unaligned_u16 *type;
 	/** Extension data */
 	struct tls_cursor data;
 	/** Next extension */
@@ -517,7 +522,7 @@ struct tls_key_share_client_hello {
 /** KeyShareEntry descriptor */
 struct tls_key_share_entry {
 	/** Named group */
-	uint16_t __attribute__ (( aligned ( 1 ) )) *group;
+	tls_unaligned_u16 *group;
 	/** Public key */
 	struct tls_cursor public;
 	/** Next key share */
@@ -527,13 +532,13 @@ struct tls_key_share_entry {
 /** KeyShareHelloRetryRequest descriptor */
 struct tls_key_share_hello_retry_request {
 	/** Named group */
-	uint16_t __attribute__ (( aligned ( 1 ) )) *group;
+	tls_unaligned_u16 *group;
 };
 
 /** KeyShareServerHello descriptor */
 struct tls_key_share_server_hello {
 	/** Named group */
-	uint16_t __attribute__ (( aligned ( 1 ) )) *group;
+	tls_unaligned_u16 *group;
 	/** Public key */
 	struct tls_cursor public;
 };
@@ -541,7 +546,7 @@ struct tls_key_share_server_hello {
 /** KeyShareServerHello/KeyShareHelloRetryRequest combined descriptor */
 union tls_key_share_server {
 	/** Named group (present in both) */
-	uint16_t __attribute__ (( aligned ( 1 ) )) *group;
+	tls_unaligned_u16 *group;
 	/** KeyShareHelloRetryRequest descriptor */
 	struct tls_key_share_hello_retry_request hrr;
 	/** KeyShareServerHello descriptor */
@@ -565,9 +570,9 @@ struct tls_named_group_list {
 /** NewSessionTicket descriptor */
 struct tls_new_session_ticket {
 	/** Lifetime hint */
-	uint32_t __attribute__ (( aligned ( 1 ) )) *lifetime;
+	tls_unaligned_u32 *lifetime;
 	/** Age obfuscation */
-	uint32_t __attribute__ (( aligned ( 1 ) )) *age;
+	tls_unaligned_u32 *age;
 	/** Nonce */
 	struct tls_cursor nonce;
 	/** Ticket */
@@ -679,7 +684,7 @@ struct tls_signature_scheme_list {
 /** SupportedVersions descriptor (in ServerHello) */
 struct tls_supported_version {
 	/** Selected version */
-	uint16_t __attribute__ (( aligned ( 1 ) )) *selected;
+	tls_unaligned_u16 *selected;
 };
 
 /** SupportedVersions descriptor (in ClientHello) */

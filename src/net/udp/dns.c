@@ -162,7 +162,7 @@ int dns_encode ( const char *string, struct dns_name *name ) {
  */
 static int dns_label ( struct dns_name *name, size_t offset ) {
 	const uint8_t *byte;
-	const uint16_t *word;
+	uint16_t word;
 	size_t len;
 	size_t ptr;
 
@@ -177,12 +177,12 @@ static int dns_label ( struct dns_name *name, size_t offset ) {
 		if ( DNS_IS_COMPRESSED ( *byte ) ) {
 
 			/* Fail if we have overrun the DNS name */
-			if ( ( offset + sizeof ( *word ) ) > name->len )
+			if ( ( offset + sizeof ( word ) ) > name->len )
 				return -EINVAL;
-			word = ( name->data + offset );
+			memcpy ( &word, ( name->data + offset ), sizeof ( word ) );
 
 			/* Extract pointer to new offset */
-			ptr = DNS_COMPRESSED_OFFSET ( ntohs ( *word ) );
+			ptr = DNS_COMPRESSED_OFFSET ( ntohs ( word ) );
 
 			/* Fail if pointer does not point backwards.
 			 * (This guarantees termination of the

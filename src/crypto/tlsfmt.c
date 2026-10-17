@@ -111,7 +111,7 @@ static const char * tls_map_name ( const uint8_t *map ) {
 static int tls_parse_extensions ( const uint8_t *map, unsigned int index,
 				  struct tls_cursor *fields,
 				  unsigned int count ) {
-	const uint16_t __attribute__ (( aligned ( 1 ) )) *invtypes;
+	const tls_unaligned_u16 *invtypes;
 	const struct tls_cursor *cursor = &fields[0];
 	struct tls_extension extension;
 	unsigned int i;
@@ -380,7 +380,7 @@ int tls_parse_opt_map ( const uint8_t *map, unsigned int version,
 static int tls_build_extensions ( const uint8_t *map, unsigned int index,
 				  struct tls_cursor *fields,
 				  unsigned int count ) {
-	const uint16_t __attribute__ (( aligned ( 1 ) )) *invtypes;
+	const tls_unaligned_u16 *invtypes;
 	struct tls_cursor *cursor = &fields[0];
 	struct tls_cursor *subcursor;
 	struct tls_extension extension;

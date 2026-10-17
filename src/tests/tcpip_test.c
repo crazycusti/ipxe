@@ -147,9 +147,11 @@ TCPIP_RANDOM_TEST ( partial, 0xcafebabe, 121, 5 );
 static uint16_t rfc_tcpip_chksum ( const void *data, size_t len ) {
 	unsigned int shift = ( ( __BYTE_ORDER == __BIG_ENDIAN ) ? 8 : 0 );
 	unsigned long sum = 0xffff;
+	uint16_t word;
 
         while ( len > 1 )  {
-		sum += *( ( uint16_t * ) data );
+		memcpy ( &word, data, sizeof ( word ) );
+		sum += word;
 		data += 2;
 		len -= 2;
 	}

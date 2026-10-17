@@ -237,7 +237,8 @@ int eth_eui64 ( const void *ll_addr, void *eui64 ) {
 
 	memcpy ( ( eui64 + 0 ), ( ll_addr + 0 ), 3 );
 	memcpy ( ( eui64 + 5 ), ( ll_addr + 3 ), 3 );
-	*( ( uint16_t * ) ( eui64 + 3 ) ) = htons ( 0xfffe );
+	*( ( uint8_t * ) ( eui64 + 3 ) ) = 0xff;
+	*( ( uint8_t * ) ( eui64 + 4 ) ) = 0xfe;
 	return 0;
 }
 
